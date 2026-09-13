@@ -4,7 +4,11 @@ import { parseSrt, type SrtData } from './parsers/srt';
 import { loadFontAtlas, type FontAtlas } from './parsers/font';
 import { pairFiles } from './engine/pairing';
 import { clampMs, formatMs } from './engine/clock';
-import { OverlayCanvas } from './ui/OverlayCanvas';
+import { OverlayCanvas } from './ui/overlay-canvas';
+import { Timeline } from './ui/timeline';
+import { Section } from './ui/section';
+import { FileRow } from './ui/file-row';
+import { Slider } from './ui/slider';
 import { useOverlaySettings } from './state/settings';
 
 interface Loaded {
@@ -210,12 +214,13 @@ export function App() {
             )}
           </Section>
 
-          <Section title="OSD">
-            <Toggle
-              label="Show OSD"
-              checked={settings.osdEnabled}
-              onChange={(v) => update({ osdEnabled: v })}
-            />
+          <Section
+            title="OSD"
+            toggle={{
+              checked: settings.osdEnabled,
+              onChange: (v) => update({ osdEnabled: v }),
+            }}
+          >
             <Slider
               label="Sync offset"
               suffix="ms"
@@ -254,12 +259,13 @@ export function App() {
             />
           </Section>
 
-          <Section title="Telemetry">
-            <Toggle
-              label="Show panel"
-              checked={settings.srtEnabled}
-              onChange={(v) => update({ srtEnabled: v })}
-            />
+          <Section
+            title="Telemetry"
+            toggle={{
+              checked: settings.srtEnabled,
+              onChange: (v) => update({ srtEnabled: v }),
+            }}
+          >
             <Slider
               label="Sync offset"
               suffix="ms"
@@ -281,6 +287,18 @@ export function App() {
                 <option value="top-right">Top right</option>
                 <option value="bottom-left">Bottom left</option>
                 <option value="bottom-right">Bottom right</option>
+              </select>
+            </label>
+            <label className="field">
+              <span>Layout</span>
+              <select
+                value={settings.srtLayout}
+                onChange={(e) =>
+                  update({ srtLayout: e.target.value as typeof settings.srtLayout })
+                }
+              >
+                <option value="single">Single line</option>
+                <option value="multi">Multiple lines</option>
               </select>
             </label>
             {availableFields.length > 0 && (
@@ -308,138 +326,5 @@ export function App() {
         </aside>
       </div>
     </div>
-  );
-}
-
-function Timeline({
-  duration,
-  current,
-  trimStart,
-  trimEnd,
-  onSeek,
-  onTrimStart,
-  onTrimEnd,
-}: {
-  duration: number;
-  current: number;
-  trimStart: number;
-  trimEnd: number;
-  onSeek: (ms: number) => void;
-  onTrimStart: (ms: number) => void;
-  onTrimEnd: (ms: number) => void;
-}) {
-  const pct = (ms: number) => (duration > 0 ? (ms / duration) * 100 : 0);
-  return (
-    <div className="timeline">
-      <div className="timeline__track">
-        <div
-          className="timeline__selection"
-          style={{ left: `${pct(trimStart)}%`, right: `${100 - pct(trimEnd)}%` }}
-        />
-        <div className="timeline__playhead" style={{ left: `${pct(current)}%` }} />
-        <input
-          className="timeline__seek"
-          type="range"
-          min={0}
-          max={duration}
-          step={1}
-          value={current}
-          onChange={(e) => onSeek(Number(e.target.value))}
-        />
-      </div>
-      <div className="timeline__trim">
-        <label>
-          In
-          <input
-            type="range"
-            min={0}
-            max={duration}
-            step={1}
-            value={trimStart}
-            onChange={(e) => onTrimStart(Number(e.target.value))}
-          />
-        </label>
-        <label>
-          Out
-          <input
-            type="range"
-            min={0}
-            max={duration}
-            step={1}
-            value={trimEnd}
-            onChange={(e) => onTrimEnd(Number(e.target.value))}
-          />
-        </label>
-      </div>
-    </div>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="panel">
-      <h2>{title}</h2>
-      {children}
-    </section>
-  );
-}
-
-function FileRow({ label, name }: { label: string; name?: string }) {
-  return (
-    <div className="filerow">
-      <span className="filerow__label">{label}</span>
-      <span className={`filerow__name ${name ? '' : 'muted'}`}>{name ?? '—'}</span>
-    </div>
-  );
-}
-
-function Toggle({
-  label,
-  checked,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <label className="toggle">
-      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-      <span>{label}</span>
-    </label>
-  );
-}
-
-function Slider({
-  label,
-  suffix,
-  min,
-  max,
-  step,
-  value,
-  onChange,
-}: {
-  label: string;
-  suffix: string;
-  min: number;
-  max: number;
-  step: number;
-  value: number;
-  onChange: (v: number) => void;
-}) {
-  return (
-    <label className="field">
-      <span>
-        {label} <em>{value}{suffix}</em>
-      </span>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-      />
-    </label>
   );
 }

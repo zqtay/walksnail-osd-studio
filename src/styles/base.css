@@ -1,0 +1,37 @@
+:root {
+  --bg: #0b0f14;
+  --panel: #141b24;
+  --panel-2: #1b2530;
+  --border: #223042;
+  --text: #e6edf3;
+  --muted: #8aa0b3;
+  --accent: #39d3a5;
+  --error: #ff6b6b;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.error {
+  color: var(--error);
+  margin-top: 16px;
+}

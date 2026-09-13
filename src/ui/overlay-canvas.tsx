@@ -68,6 +68,7 @@ export function OverlayCanvas({ video, osd, srt, font, settings }: OverlayCanvas
           renderSrtPanel(ctx, cue, w, h, {
             fields: settings.srtFields,
             anchor: settings.srtAnchor,
+            layout: settings.srtLayout,
           });
         }
       }

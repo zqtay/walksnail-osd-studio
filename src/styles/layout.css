@@ -1,0 +1,74 @@
+.app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.app__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.app__header h1 {
+  font-size: 17px;
+  margin: 0;
+}
+
+.app__badge {
+  font-size: 12px;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+
+.app__header .btn {
+  margin-left: auto;
+}
+
+/* Layout: stage + sidebar */
+.layout {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  min-height: 0;
+}
+
+.stage {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.stage__empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 2px dashed var(--border);
+  border-radius: 14px;
+  color: var(--muted);
+}
+
+.stage__empty strong {
+  color: var(--text);
+  font-size: 18px;
+}
+
+.sidebar {
+  border-left: 1px solid var(--border);
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
