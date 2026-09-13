@@ -83,6 +83,16 @@ milliseconds (`0, 115, 259, … 85773`).
 `timestamp_ms ≤ t` (step/hold, not interpolated). Glyph `0x20` (space) renders
 nothing.
 
+**Update rate is decoupled from the DVR frame rate.** The OSD stream is written
+at the goggle's telemetry/MSP cadence (~5–10 Hz), *not* once per video frame. In
+the sample the 575 frames span 85.77 s → **~6.7 frames/s**, with inter-frame
+gaps of 108–178 ms (avg ~149 ms). Consequently a 1-second clip has ~7 OSD
+frames regardless of whether the DVR records at 60 fps or 100 fps — the file
+does **not** contain one frame per video frame. Each OSD frame is *held* across
+all video frames that fall within its interval. This is why sync is driven by
+the absolute `timestamp_ms` timeline rather than by frame index, and why fast-
+changing OSD elements visibly "step" at ~7 Hz in the source recording.
+
 > The grid is `53 × 20` for HD/widescreen. SD or other FC configs may differ, so
 > `cols`/`rows` **must** be read from the header, never hard-coded.
 
@@ -136,6 +146,11 @@ Parser must be schema-tolerant: extract every `Key:Value` / `Key=Value` token,
 strip known unit suffixes (`V`, `ms`, `Mbps`, `m`), and keep unknown keys as raw
 strings so future firmware fields still display. The sample has **575 cues**
 (note: the index `574` appears twice, so indices run 1..574 across 575 blocks).
+
+Like the OSD stream, cues are emitted at the VRX telemetry cadence (~7 Hz, each
+cue ~130–150 ms long), **not** once per DVR video frame. The active cue is
+selected by its `HH:MM:SS,mmm` time interval, so the panel stays aligned at any
+DVR frame rate.
 
 ### 3.4 Video (`.mp4`)
 - Standard Walksnail Avatar DVR H.264/H.265 MP4. Decoded via the native
