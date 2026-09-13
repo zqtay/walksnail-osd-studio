@@ -2,8 +2,7 @@ import { useEffect, useRef } from 'react';
 import type { OsdData } from '../parsers/osd';
 import type { SrtData } from '../parsers/srt';
 import type { FontAtlas } from '../parsers/font';
-import { activeOsdFrame, activeSrtCue } from '../engine/clock';
-import { renderOsdFrame, renderSrtPanel } from '../engine/renderer';
+import { drawOverlay } from '../engine/compositor';
 import type { OverlaySettings } from '../state/settings';
 
 interface OverlayCanvasProps {
@@ -50,28 +49,7 @@ export function OverlayCanvas({ video, osd, srt, font, settings }: OverlayCanvas
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       const tMs = video.currentTime * 1000;
-
-      if (settings.osdEnabled && osd && font) {
-        const frame = activeOsdFrame(osd, tMs, settings.osdOffsetMs);
-        if (frame) {
-          renderOsdFrame(ctx, frame, osd.header.cols, osd.header.rows, font, w, h, {
-            offsetX: settings.osdOffsetX,
-            offsetY: settings.osdOffsetY,
-            scale: settings.osdScale,
-          });
-        }
-      }
-
-      if (settings.srtEnabled && srt) {
-        const cue = activeSrtCue(srt, tMs, settings.srtOffsetMs);
-        if (cue) {
-          renderSrtPanel(ctx, cue, w, h, {
-            fields: settings.srtFields,
-            anchor: settings.srtAnchor,
-            layout: settings.srtLayout,
-          });
-        }
-      }
+      drawOverlay(ctx, { osd, srt, font }, settings, tMs, w, h);
 
       schedule();
     };

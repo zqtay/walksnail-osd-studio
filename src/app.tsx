@@ -9,6 +9,12 @@ import { Timeline } from './ui/timeline';
 import { Section } from './ui/section';
 import { FileRow } from './ui/file-row';
 import { Slider } from './ui/slider';
+import { ExportPanel, type ExportUiState } from './ui/export-panel';
+import {
+  exportWithMediaRecorder,
+  extensionForMime,
+  pickMimeType,
+} from './export/media-recorder';
 import { useOverlaySettings } from './state/settings';
 
 interface Loaded {
@@ -28,14 +34,27 @@ export function App() {
   const [settings, update] = useOverlaySettings();
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const exportVideoRef = useRef<HTMLVideoElement>(null);
   const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null);
   const [duration, setDuration] = useState(0); // ms
   const [current, setCurrent] = useState(0); // ms
   const [playing, setPlaying] = useState(false);
+  const [nativeSize, setNativeSize] = useState({ w: 1920, h: 1080 });
 
   // Trim range in ms.
   const [trimStart, setTrimStart] = useState(0);
   const [trimEnd, setTrimEnd] = useState(0);
+
+  // Export state.
+  const [exportUi, setExportUi] = useState<ExportUiState>({
+    width: 1920,
+    height: 1080,
+    bitrateMbps: 40,
+    includeAudio: false,
+  });
+  const [exporting, setExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+  const exportAbort = useRef<AbortController | null>(null);
 
   useEffect(() => setVideoEl(videoRef.current), [loaded.videoUrl]);
 
@@ -80,6 +99,10 @@ export function App() {
     setDuration(ms);
     setTrimStart(0);
     setTrimEnd(ms);
+    const w = v.videoWidth || 1920;
+    const h = v.videoHeight || 1080;
+    setNativeSize({ w, h });
+    setExportUi((prev) => ({ ...prev, width: w, height: h }));
   }
 
   function seek(ms: number) {
@@ -98,6 +121,55 @@ export function App() {
   function stepFrame(dir: number) {
     // Approximate a single frame at 30fps when paused.
     seek(current + dir * (1000 / 30));
+  }
+
+  async function runExport() {
+    const exportVideo = exportVideoRef.current;
+    if (!exportVideo || !loaded.videoName) return;
+    setError(undefined);
+    setExporting(true);
+    setExportProgress(0);
+    const controller = new AbortController();
+    exportAbort.current = controller;
+    try {
+      const result = await exportWithMediaRecorder(
+        exportVideo,
+        { osd: loaded.osd, srt: loaded.srt, font: loaded.font },
+        settings,
+        {
+          startMs: trimStart,
+          endMs: trimEnd,
+          width: exportUi.width,
+          height: exportUi.height,
+          videoBitsPerSecond: exportUi.bitrateMbps * 1_000_000,
+          includeAudio: exportUi.includeAudio,
+        },
+        (p) => setExportProgress(p.fraction),
+        controller.signal,
+      );
+
+      const mime = pickMimeType() ?? result.mimeType;
+      const ext = extensionForMime(mime);
+      const base = loaded.videoName.replace(/\.[^.]+$/, '');
+      const url = URL.createObjectURL(result.blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${base}-osd.${ext}`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    } catch (err) {
+      if (!(err instanceof DOMException && err.name === 'AbortError')) {
+        setError(err instanceof Error ? err.message : String(err));
+      }
+    } finally {
+      setExporting(false);
+      setExportProgress(0);
+      exportAbort.current = null;
+    }
+  }
+
+  function cancelExport() {
+    exportAbort.current?.abort();
   }
 
   const hasVideo = Boolean(loaded.videoUrl);
@@ -158,14 +230,22 @@ export function App() {
                 />
               </div>
 
+              {/* Dedicated source element for export (muted, off-screen). */}
+              <video
+                ref={exportVideoRef}
+                src={loaded.videoUrl}
+                muted
+                playsInline
+                preload="auto"
+                style={{ display: 'none' }}
+              />
+
               <Timeline
                 duration={duration}
                 current={current}
                 trimStart={trimStart}
                 trimEnd={trimEnd}
                 onSeek={seek}
-                onTrimStart={(v) => setTrimStart(clampMs(v, 0, trimEnd))}
-                onTrimEnd={(v) => setTrimEnd(clampMs(v, trimStart, duration))}
               />
 
               <div className="transport">
@@ -193,9 +273,6 @@ export function App() {
                     <option value="2">2×</option>
                   </select>
                 </label>
-                <span className="trim-readout">
-                  Export: {formatMs(trimStart)} → {formatMs(trimEnd)}
-                </span>
               </div>
             </div>
           )}
@@ -322,6 +399,27 @@ export function App() {
                 ))}
               </div>
             )}
+          </Section>
+
+          <Section title="Export">
+            <ExportPanel
+              state={exportUi}
+              onChange={(patch) => setExportUi((prev) => ({ ...prev, ...patch }))}
+              durationMs={duration}
+              trimStartMs={trimStart}
+              trimEndMs={trimEnd}
+              onTrimChange={(s, e) => {
+                setTrimStart(clampMs(s, 0, e));
+                setTrimEnd(clampMs(e, s, duration));
+              }}
+              nativeWidth={nativeSize.w}
+              nativeHeight={nativeSize.h}
+              busy={exporting}
+              progress={exportProgress}
+              onExport={() => void runExport()}
+              onCancel={cancelExport}
+              disabled={!hasVideo}
+            />
           </Section>
         </aside>
       </div>

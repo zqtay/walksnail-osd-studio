@@ -1,0 +1,75 @@
+/* Dual-thumb range slider (two overlaid range inputs). */
+.range {
+  position: relative;
+  height: 20px;
+  margin-top: 4px;
+}
+
+.range__rail,
+.range__fill {
+  position: absolute;
+  top: 50%;
+  height: 4px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.range__rail {
+  left: 0;
+  right: 0;
+  background: var(--panel-2);
+}
+
+.range__fill {
+  background: var(--accent);
+}
+
+.range__input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+  /* Let clicks fall through the track; only thumbs are interactive. */
+  pointer-events: none;
+}
+
+.range__input::-webkit-slider-runnable-track {
+  background: transparent;
+  height: 100%;
+}
+
+.range__input::-moz-range-track {
+  background: transparent;
+  height: 100%;
+}
+
+.range__input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  /* Center the thumb on the rail: (container 20px - thumb 13px) / 2. */
+  margin-top: 3.5px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.range__input::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  pointer-events: auto;
+}
