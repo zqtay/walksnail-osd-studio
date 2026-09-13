@@ -15,6 +15,8 @@ export interface OverlaySettings {
   osdOffsetY: number;
   /** OSD extra scale multiplier. */
   osdScale: number;
+  /** Hidden OSD grid cells (row*cols+col indices) to mask out. */
+  osdMask: number[];
   /** SRT panel field keys to display. */
   srtFields: string[];
   /** SRT panel anchor corner. */
@@ -31,6 +33,7 @@ export const DEFAULT_SETTINGS: OverlaySettings = {
   osdOffsetX: 0,
   osdOffsetY: 0,
   osdScale: 1,
+  osdMask: [],
   srtFields: ['Signal', 'Delay', 'Bitrate', 'SBat', 'Distance'],
   srtAnchor: 'bottom-left',
   srtLayout: 'single',

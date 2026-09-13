@@ -36,6 +36,7 @@ export function drawOverlay(
         offsetX: settings.osdOffsetX,
         offsetY: settings.osdOffsetY,
         scale: settings.osdScale,
+        mask: settings.osdMask.length > 0 ? new Set(settings.osdMask) : undefined,
       });
     }
   }

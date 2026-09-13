@@ -9,6 +9,7 @@ import { Timeline } from './ui/timeline';
 import { Section } from './ui/section';
 import { FileRow } from './ui/file-row';
 import { Slider } from './ui/slider';
+import { MaskEditor } from './ui/mask-editor';
 import { ExportPanel, type ExportUiState } from './ui/export-panel';
 import {
   exportWithMediaRecorder,
@@ -41,6 +42,7 @@ export function App() {
   const [playing, setPlaying] = useState(false);
   const [volume, setVolume] = useState(1); // 0..1
   const [nativeSize, setNativeSize] = useState({ w: 1920, h: 1080 });
+  const [maskEditing, setMaskEditing] = useState(false);
 
   // Trim range in ms.
   const [trimStart, setTrimStart] = useState(0);
@@ -238,6 +240,19 @@ export function App() {
                   font={loaded.font}
                   settings={settings}
                 />
+                {maskEditing && loaded.osd && (
+                  <MaskEditor
+                    cols={loaded.osd.header.cols}
+                    rows={loaded.osd.header.rows}
+                    videoWidth={nativeSize.w}
+                    videoHeight={nativeSize.h}
+                    offsetX={settings.osdOffsetX}
+                    offsetY={settings.osdOffsetY}
+                    scale={settings.osdScale}
+                    mask={settings.osdMask}
+                    onChange={(m) => update({ osdMask: m })}
+                  />
+                )}
               </div>
 
               {/* Dedicated source element for export (muted, off-screen). */}
@@ -356,6 +371,31 @@ export function App() {
               value={settings.osdOffsetY}
               onChange={(v) => update({ osdOffsetY: v })}
             />
+            <div className="mask-controls">
+              <button
+                className={`btn ${maskEditing ? 'btn--primary' : ''}`}
+                onClick={() => setMaskEditing((v) => !v)}
+                disabled={!loaded.osd}
+              >
+                {maskEditing ? 'Done masking' : 'Edit mask'}
+              </button>
+              <button
+                className="btn"
+                onClick={() => update({ osdMask: [] })}
+                disabled={settings.osdMask.length === 0}
+              >
+                Clear
+              </button>
+              <span className="mask-controls__count">
+                {settings.osdMask.length} hidden
+              </span>
+            </div>
+            {maskEditing && (
+              <p className="hint">
+                Drag over the video to hide OSD cells; drag over hidden cells to
+                reveal them.
+              </p>
+            )}
           </Section>
 
           <Section

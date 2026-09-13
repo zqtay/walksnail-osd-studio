@@ -83,6 +83,20 @@ select {
   cursor: pointer;
 }
 
+/* Mask controls */
+.mask-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.mask-controls__count {
+  font-size: 12px;
+  color: var(--muted);
+  margin-left: auto;
+}
+
 /* Export panel */
 .export {
   display: flex;
