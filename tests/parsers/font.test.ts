@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { pageCountFromWidth, glyphRect, TILE_W, TILE_H } from '../font';
+import { pageCountFromWidth, glyphRect, TILE_W, TILE_H } from '../../src/parsers/font';
 
 describe('font atlas geometry', () => {
   it('derives page count from image width', () => {
