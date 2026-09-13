@@ -46,3 +46,14 @@
   color: var(--muted);
   font-size: 13px;
 }
+
+.volume {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.volume input {
+  width: 90px;
+}

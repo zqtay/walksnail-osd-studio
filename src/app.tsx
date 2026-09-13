@@ -39,6 +39,7 @@ export function App() {
   const [duration, setDuration] = useState(0); // ms
   const [current, setCurrent] = useState(0); // ms
   const [playing, setPlaying] = useState(false);
+  const [volume, setVolume] = useState(1); // 0..1
   const [nativeSize, setNativeSize] = useState({ w: 1920, h: 1080 });
 
   // Trim range in ms.
@@ -121,6 +122,15 @@ export function App() {
   function stepFrame(dir: number) {
     // Approximate a single frame at 30fps when paused.
     seek(current + dir * (1000 / 30));
+  }
+
+  function changeVolume(v: number) {
+    setVolume(v);
+    const video = videoRef.current;
+    if (video) {
+      video.volume = v;
+      video.muted = v === 0;
+    }
   }
 
   async function runExport() {
@@ -272,6 +282,18 @@ export function App() {
                     <option value="1.5">1.5×</option>
                     <option value="2">2×</option>
                   </select>
+                </label>
+                <label className="volume">
+                  {volume === 0 ? '🔇' : '🔊'}
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={volume}
+                    onChange={(e) => changeVolume(Number(e.target.value))}
+                    aria-label="Volume"
+                  />
                 </label>
               </div>
             </div>
