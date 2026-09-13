@@ -19,6 +19,8 @@ export interface OverlaySettings {
   srtFields: string[];
   /** SRT panel anchor corner. */
   srtAnchor: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+  /** SRT panel layout: all fields on one line, or one per line. */
+  srtLayout: 'single' | 'multi';
 }
 
 export const DEFAULT_SETTINGS: OverlaySettings = {
@@ -31,6 +33,7 @@ export const DEFAULT_SETTINGS: OverlaySettings = {
   osdScale: 1,
   srtFields: ['Signal', 'Delay', 'Bitrate', 'SBat', 'Distance'],
   srtAnchor: 'bottom-left',
+  srtLayout: 'single',
 };
 
 const STORAGE_KEY = 'walksnail-osd-studio:settings';

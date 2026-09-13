@@ -25,6 +25,8 @@ export interface SrtPanelOptions {
   fields: string[];
   /** Anchor corner for the panel. */
   anchor?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+  /** One field per line, or all fields joined on a single line. */
+  layout?: 'single' | 'multi';
   /** Panel font size in px (destination). */
   fontSize?: number;
   /** Background opacity 0..1. */
@@ -104,12 +106,16 @@ export function renderSrtPanel(
   const fontSize = opts.fontSize ?? Math.round(targetH * 0.022);
   const padding = opts.padding ?? Math.round(fontSize * 0.6);
   const anchor = opts.anchor ?? 'bottom-left';
+  const layout = opts.layout ?? 'single';
   const lineHeight = Math.round(fontSize * 1.35);
 
-  const lines = opts.fields
+  const parts = opts.fields
     .filter((k) => cue.fields[k] !== undefined)
     .map((k) => `${k}: ${cue.fields[k]}`);
-  if (lines.length === 0) return;
+  if (parts.length === 0) return;
+
+  // Single line joins all fields; multi line puts one field per row.
+  const lines = layout === 'single' ? [parts.join('   ')] : parts;
 
   ctx.save();
   ctx.font = `${fontSize}px ui-monospace, Menlo, Consolas, monospace`;
@@ -117,7 +123,8 @@ export function renderSrtPanel(
 
   const textW = Math.max(...lines.map((l) => ctx.measureText(l).width));
   const boxW = textW + padding * 2;
-  const boxH = lines.length * lineHeight + padding * 2;
+  // Height = leading between lines + one glyph height for the last line.
+  const boxH = (lines.length - 1) * lineHeight + fontSize + padding * 2;
 
   const right = anchor.endsWith('right');
   const bottom = anchor.startsWith('bottom');
