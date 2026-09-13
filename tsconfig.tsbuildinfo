@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/parsers/font.ts","./src/parsers/osd.ts","./src/parsers/srt.ts","./src/parsers/__tests__/font.test.ts","./src/parsers/__tests__/osd.test.ts","./src/parsers/__tests__/srt.test.ts","./vite.config.ts"],"version":"5.9.3"}
