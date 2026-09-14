@@ -33,6 +33,10 @@ export interface SrtPanelOptions {
   backgroundOpacity?: number;
   /** Padding in px. */
   padding?: number;
+  /** Horizontal nudge in destination px (positive = right). */
+  offsetX?: number;
+  /** Vertical nudge in destination px (positive = down). */
+  offsetY?: number;
 }
 
 /**
@@ -93,6 +97,21 @@ export function renderOsdFrame(
 }
 
 /**
+ * Walksnail telemetry fields that are recorded with one decimal place (volts /
+ * Mbps). Number coercion drops trailing `.0`, so we restore fixed precision for
+ * display.
+ */
+const ONE_DECIMAL_FIELDS = new Set(['SBat', 'GBat', 'Bitrate']);
+
+/** Format a telemetry value, preserving the source's fixed decimal precision. */
+function formatFieldValue(key: string, value: number | string): string {
+  if (typeof value === 'number' && ONE_DECIMAL_FIELDS.has(key)) {
+    return value.toFixed(1);
+  }
+  return String(value);
+}
+
+/**
  * Draw a telemetry panel derived from an SRT cue. Kept visually simple and
  * deterministic; styling can grow without changing call sites.
  */
@@ -111,7 +130,7 @@ export function renderSrtPanel(
 
   const parts = opts.fields
     .filter((k) => cue.fields[k] !== undefined)
-    .map((k) => `${k}: ${cue.fields[k]}`);
+    .map((k) => `${k}: ${formatFieldValue(k, cue.fields[k])}`);
   if (parts.length === 0) return;
 
   // Single line joins all fields; multi line puts one field per row.
@@ -128,8 +147,8 @@ export function renderSrtPanel(
 
   const right = anchor.endsWith('right');
   const bottom = anchor.startsWith('bottom');
-  const boxX = right ? targetW - boxW - padding : padding;
-  const boxY = bottom ? targetH - boxH - padding : padding;
+  const boxX = (right ? targetW - boxW - padding : padding) + (opts.offsetX ?? 0);
+  const boxY = (bottom ? targetH - boxH - padding : padding) + (opts.offsetY ?? 0);
 
   const bgOpacity = opts.backgroundOpacity ?? 0.45;
   if (bgOpacity > 0) {

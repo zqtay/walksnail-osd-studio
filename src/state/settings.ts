@@ -25,6 +25,12 @@ export interface OverlaySettings {
   srtLayout: 'single' | 'multi';
   /** Show the dark background box behind the telemetry panel. */
   srtBackground: boolean;
+  /** Telemetry panel size multiplier (scales the font). */
+  srtScale: number;
+  /** Telemetry panel horizontal nudge (destination px). */
+  srtOffsetX: number;
+  /** Telemetry panel vertical nudge (destination px). */
+  srtOffsetY: number;
 }
 
 export const DEFAULT_SETTINGS: OverlaySettings = {
@@ -40,6 +46,9 @@ export const DEFAULT_SETTINGS: OverlaySettings = {
   srtAnchor: 'bottom-left',
   srtLayout: 'single',
   srtBackground: true,
+  srtScale: 1,
+  srtOffsetX: 0,
+  srtOffsetY: 0,
 };
 
 const STORAGE_KEY = 'walksnail-osd-studio:settings';

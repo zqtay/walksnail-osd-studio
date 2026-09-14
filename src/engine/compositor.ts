@@ -49,6 +49,9 @@ export function drawOverlay(
         anchor: settings.srtAnchor,
         layout: settings.srtLayout,
         backgroundOpacity: settings.srtBackground ? undefined : 0,
+        fontSize: Math.round(height * 0.022 * settings.srtScale),
+        offsetX: settings.srtOffsetX,
+        offsetY: settings.srtOffsetY,
       });
     }
   }

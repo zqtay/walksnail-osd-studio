@@ -472,6 +472,33 @@ export function App() {
               />
               <span>Background box</span>
             </label>
+            <Slider
+              label="Size"
+              suffix="×"
+              min={0.5}
+              max={3}
+              step={0.05}
+              value={settings.srtScale}
+              onChange={(v) => update({ srtScale: v })}
+            />
+            <Slider
+              label="Nudge X"
+              suffix="px"
+              min={-400}
+              max={400}
+              step={1}
+              value={settings.srtOffsetX}
+              onChange={(v) => update({ srtOffsetX: v })}
+            />
+            <Slider
+              label="Nudge Y"
+              suffix="px"
+              min={-400}
+              max={400}
+              step={1}
+              value={settings.srtOffsetY}
+              onChange={(v) => update({ srtOffsetY: v })}
+            />
             {availableFields.length > 0 && (
               <div className="fields">
                 {availableFields.map((f) => (
