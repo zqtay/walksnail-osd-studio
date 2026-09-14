@@ -1,0 +1,1 @@
+{"name":"Walksnail OSD Studio","short_name":"OSD Studio","start_url":"./","display":"standalone","background_color":"#0b0f14","lang":"en","scope":"./","description":"Offline tool to combine Walksnail DVR video with .osd overlay and .srt telemetry.","theme_color":"#0b0f14","icons":[{"src":"favicon.svg","sizes":"any","type":"image/svg+xml","purpose":"any"}]}

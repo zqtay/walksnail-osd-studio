@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0b0f14" />
+    <!--
+      Strict CSP: everything is same-origin; blobs allowed for media/workers/images.
+      wasm-unsafe-eval is required by ffmpeg.wasm fallback. No remote origins.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; media-src 'self' blob:; worker-src 'self' blob:; font-src 'self'; connect-src 'self' blob: data:; object-src 'none'; base-uri 'self'"
+    />
+    <title>Walksnail OSD Studio</title>
+    <script type="module" crossorigin src="./assets/index-DXzAWGal.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-Cmc3yxC9.css">
+  <link rel="manifest" href="./manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="./registerSW.js"></script></head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
