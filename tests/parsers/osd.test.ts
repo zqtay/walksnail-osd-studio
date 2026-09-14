@@ -4,7 +4,7 @@ import {
   osdFrameIndexAt,
   OSD_HEADER_SIZE,
   OsdParseError,
-} from '../../src/parsers/osd';
+} from '../../src/lib/parsers/osd';
 import { readOsd, sampleBasenames } from '../helpers/fixtures';
 
 /** Exact expected values for known fixtures. */

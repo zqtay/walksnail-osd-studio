@@ -4,9 +4,9 @@ import {
   activeSrtCue,
   clampMs,
   formatMs,
-} from '../../src/engine/clock';
-import type { OsdData } from '../../src/parsers/osd';
-import type { SrtData } from '../../src/parsers/srt';
+} from '../../src/lib/engine/clock';
+import type { OsdData } from '../../src/lib/parsers/osd';
+import type { SrtData } from '../../src/lib/parsers/srt';
 
 const osd: OsdData = {
   header: { magic: 'BTFL', unknown32: 0, cols: 1, rows: 1 },

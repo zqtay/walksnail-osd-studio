@@ -1,4 +1,4 @@
-import type { OverlaySettings } from '../state/settings';
+import type { OverlaySettings } from '../../state/settings';
 import { drawOverlay, type OverlaySources } from '../engine/compositor';
 import type { ExportOptions, ExportProgress, ExportResult } from './types';
 

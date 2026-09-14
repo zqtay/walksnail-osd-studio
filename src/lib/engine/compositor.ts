@@ -3,7 +3,7 @@ import type { SrtData } from '../parsers/srt';
 import type { FontAtlas } from '../parsers/font';
 import { activeOsdFrame, activeSrtCue } from './clock';
 import { renderOsdFrame, renderSrtPanel } from './renderer';
-import type { OverlaySettings } from '../state/settings';
+import type { OverlaySettings } from '../../state/settings';
 
 type Ctx2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 

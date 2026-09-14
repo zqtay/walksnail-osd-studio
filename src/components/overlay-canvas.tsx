@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react';
-import type { OsdData } from '../parsers/osd';
-import type { SrtData } from '../parsers/srt';
-import type { FontAtlas } from '../parsers/font';
-import { drawOverlay } from '../engine/compositor';
+import type { OsdData } from '../lib/parsers/osd';
+import type { SrtData } from '../lib/parsers/srt';
+import type { FontAtlas } from '../lib/parsers/font';
+import { drawOverlay } from '../lib/engine/compositor';
 import type { OverlaySettings } from '../state/settings';
 
 interface OverlayCanvasProps {

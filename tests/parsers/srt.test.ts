@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseSrt, srtCueIndexAt, SrtParseError } from '../../src/parsers/srt';
+import { parseSrt, srtCueIndexAt, SrtParseError } from '../../src/lib/parsers/srt';
 import { readSrt, sampleBasenames } from '../helpers/fixtures';
 
 const KNOWN_KEYS = [

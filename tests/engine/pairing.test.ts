@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { classifyFile, pairFiles } from '../../src/engine/pairing';
+import { classifyFile, pairFiles } from '../../src/lib/engine/pairing';
 
 function mkFile(name: string, type = ''): File {
   return new File([new Uint8Array([0])], name, { type });

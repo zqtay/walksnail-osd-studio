@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { extensionForMime, pickMimeType } from '../../src/export/media-recorder';
+import { extensionForMime, pickMimeType } from '../../src/lib/export/media-recorder';
 
 describe('extensionForMime', () => {
   it('maps mp4 and webm mimes to file extensions', () => {

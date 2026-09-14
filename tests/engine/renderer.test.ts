@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { computeOsdLayout } from '../../src/engine/renderer';
-import { TILE_W, TILE_H } from '../../src/parsers/font';
+import { computeOsdLayout } from '../../src/lib/engine/renderer';
+import { TILE_W, TILE_H } from '../../src/lib/parsers/font';
 
 describe('computeOsdLayout', () => {
   it('fits the grid within the target and centers it', () => {

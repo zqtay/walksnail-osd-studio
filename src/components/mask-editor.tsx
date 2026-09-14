@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { computeOsdLayout } from '../engine/renderer';
-import { TILE_W, TILE_H } from '../parsers/font';
+import { computeOsdLayout } from '../lib/engine/renderer';
+import { TILE_W, TILE_H } from '../lib/parsers/font';
 
 interface MaskEditorProps {
   cols: number;

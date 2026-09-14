@@ -1,4 +1,4 @@
-import { formatMs } from '../engine/clock';
+import { formatMs } from '../../lib/engine/clock';
 import { RangeSlider } from './range-slider';
 
 export interface ExportUiState {
@@ -123,7 +123,7 @@ export function ExportPanel({
 
       <p className="hint">
         {highQuality
-          ? 'Encodes an H.264 MP4 with Mediabunny — deterministic, glitch-free, with audio copied losslessly.'
+          ? 'Encodes an H.264 MP4 with Mediabunny.'
           : 'Falls back to real-time capture; audio support varies by browser.'}
       </p>
     </div>
