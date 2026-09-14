@@ -14,14 +14,18 @@ import { ExportPanel, type ExportUiState } from './ui/export-panel';
 import {
   exportWithMediaRecorder,
   extensionForMime,
-  pickMimeType,
 } from './export/media-recorder';
 import { useOverlaySettings } from './state/settings';
+
+/** Lightweight capability check (no Mediabunny import) for the export path. */
+const canHighQualityExport =
+  typeof VideoEncoder !== 'undefined' && typeof VideoFrame !== 'undefined';
 
 interface Loaded {
   osd?: OsdData;
   srt?: SrtData;
   font?: FontAtlas;
+  videoFile?: File;
   videoUrl?: string;
   videoName?: string;
   osdName?: string;
@@ -74,6 +78,7 @@ export function App() {
     try {
       if (paired.video) {
         if (next.videoUrl) URL.revokeObjectURL(next.videoUrl);
+        next.videoFile = paired.video;
         next.videoUrl = URL.createObjectURL(paired.video);
         next.videoName = paired.video.name;
       }
@@ -137,31 +142,50 @@ export function App() {
 
   async function runExport() {
     const exportVideo = exportVideoRef.current;
-    if (!exportVideo || !loaded.videoName) return;
+    if (!loaded.videoName) return;
     setError(undefined);
     setExporting(true);
     setExportProgress(0);
     const controller = new AbortController();
     exportAbort.current = controller;
-    try {
-      const result = await exportWithMediaRecorder(
-        exportVideo,
-        { osd: loaded.osd, srt: loaded.srt, font: loaded.font },
-        settings,
-        {
-          startMs: trimStart,
-          endMs: trimEnd,
-          width: exportUi.width,
-          height: exportUi.height,
-          videoBitsPerSecond: exportUi.bitrateMbps * 1_000_000,
-          includeAudio: exportUi.includeAudio,
-        },
-        (p) => setExportProgress(p.fraction),
-        controller.signal,
-      );
 
-      const mime = pickMimeType() ?? result.mimeType;
-      const ext = extensionForMime(mime);
+    const exportOptions = {
+      startMs: trimStart,
+      endMs: trimEnd,
+      width: exportUi.width,
+      height: exportUi.height,
+      videoBitsPerSecond: exportUi.bitrateMbps * 1_000_000,
+      includeAudio: exportUi.includeAudio,
+    };
+    const sources = { osd: loaded.osd, srt: loaded.srt, font: loaded.font };
+
+    try {
+      let result;
+      if (canHighQualityExport && loaded.videoFile) {
+        const { exportWithMediabunny } = await import('./export/mediabunny');
+        result = await exportWithMediabunny(
+          sources,
+          settings,
+          exportOptions,
+          loaded.videoFile,
+          (p) => setExportProgress(p.fraction),
+          controller.signal,
+        );
+      } else if (exportVideo) {
+        const mrResult = await exportWithMediaRecorder(
+          exportVideo,
+          sources,
+          settings,
+          exportOptions,
+          (p) => setExportProgress(p.fraction),
+          controller.signal,
+        );
+        result = mrResult;
+      } else {
+        return;
+      }
+
+      const ext = extensionForMime(result.mimeType);
       const base = loaded.videoName.replace(/\.[^.]+$/, '');
       const url = URL.createObjectURL(result.blob);
       const a = document.createElement('a');
@@ -481,6 +505,7 @@ export function App() {
               onExport={() => void runExport()}
               onCancel={cancelExport}
               disabled={!hasVideo}
+              highQuality={canHighQualityExport}
             />
           </Section>
         </aside>

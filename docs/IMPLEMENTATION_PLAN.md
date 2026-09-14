@@ -14,10 +14,9 @@ into verifiable milestones, each ending in something runnable.
 | Styling        | CSS Modules / Tailwind | Small footprint, no runtime network |
 | Overlay render | **Canvas 2D** (WebGL later) | Simplicity first; deterministic output |
 | Video preview  | `<video>` + `requestVideoFrameCallback` | Frame-accurate clock |
-| Export (primary) | **WebCodecs** + `mp4-muxer` | Fast, high quality, in-browser |
-| Export (fallback) | **`@ffmpeg/ffmpeg` (WASM)** | Universal; handles audio remux |
-| Export (last resort) | `MediaRecorder` on canvas | Works everywhere, lower fidelity |
-| PWA            | `vite-plugin-pwa` (Workbox) | Precache shell + WASM for offline |
+| Export (primary) | **Mediabunny** (WebCodecs) | Demuxes source, composites overlay per frame, re-encodes H.264, copies audio losslessly — deterministic & glitch-free |
+| Export (fallback) | `MediaRecorder` on canvas | Works where WebCodecs is unavailable; real-time capture, lower fidelity |
+| PWA            | `vite-plugin-pwa` (Workbox) | Precache shell + export chunk for offline |
 | Tests          | **Vitest** + Playwright | Unit (parsers) + e2e (playback/export) |
 
 All dependencies are vendored/precached so the app runs with no network.
@@ -40,11 +39,12 @@ walksnail-osd/
 │  ├─ engine/
 │  │  ├─ clock.ts             # time source + sync offsets + lookups
 │  │  ├─ renderer.ts          # OSD grid + SRT panel compositor
+│  │  ├─ compositor.ts        # shared draw for preview + export
 │  │  └─ pairing.ts           # basename auto-pairing
 │  ├─ export/
-│  │  ├─ webcodecs.ts
-│  │  ├─ ffmpeg.ts
-│  │  └─ worker.ts
+│  │  ├─ types.ts             # shared export option/result types
+│  │  ├─ mediabunny.ts        # primary: Mediabunny conversion (lazy-loaded)
+│  │  └─ media-recorder.ts    # fallback: real-time canvas capture
 │  ├─ state/                  # settings store + localStorage persistence
 │  ├─ ui/                     # React components
 │  ├─ app.tsx
@@ -121,18 +121,27 @@ interface FontAtlas { tileW: 24; tileH: 36; pages: number;
 - The reference `docs/examples/ui.JPG` guides features only — not the layout.
 
 ### M6 — Export pipeline  *(exit: downloadable burned-in clip)*
-- **Trim range:** numeric start/end + timeline handles; export only frames in
-  `[start, end]`, validated (`start < end`, within bounds), overlay aligned to
-  the original timeline.
-- `export/worker.ts` orchestrates offscreen render per frame.
-- **WebCodecs path:** decode → composite on `OffscreenCanvas` → encode → mux
-  with `mp4-muxer`; feature-detect and fall back.
-- **ffmpeg.wasm path:** render CanvasFrames → encode; handles audio remux + trim.
-- **MediaRecorder path:** real-time canvas capture (lower fidelity).
-- Options: trim, container, encoder, bitrate, scale (down/**upscale**), audio
-  copy/drop, optional **chroma-key background** for transparent-OSD compositing;
-  progress + cancel.
+- **Trim range:** dual-thumb slider in the Export panel; export only the
+  `[start, end]` range, validated (`start < end`, within bounds), overlay aligned
+  to the original timeline.
+- Overlay compositing is shared with the live preview via `engine/compositor.ts`
+  (`drawOverlay`), so preview and export are pixel-identical.
+- **Mediabunny path (primary):** `Conversion` reads the source `File`
+  (`BlobSource`), trims to range, decodes sequentially, composites the overlay in
+  the per-frame `process` hook (frames carry input-file timestamps that align
+  with the OSD/SRT timelines), re-encodes H.264 to an `Mp4OutputFormat` +
+  `BufferTarget`, and copies audio losslessly. Deterministic and glitch-free —
+  no real-time playback or per-frame seeking. Lazy-loaded to keep the initial
+  bundle small; the chunk is precached for offline use.
+- **MediaRecorder path (fallback):** fixed-fps `captureStream` of a canvas with
+  WebAudio-sourced audio; used only when WebCodecs is unavailable.
+- Options: trim, resolution (native / down / **upscale**), bitrate, audio
+  include/drop; progress + cancel via `AbortSignal`.
+- Output downloads as `<name>-osd.mp4`.
 - Verify OSD layer is pixel-identical to preview at sampled timestamps.
+
+> Future options still open: chroma-key background for transparent-OSD
+> compositing, and WebM/VP9 output. Not yet implemented.
 
 ### M7 — Hardening & polish  *(exit: acceptance criteria met)*
 - Playwright e2e: load sample → assert overlay → export → validate output opens.

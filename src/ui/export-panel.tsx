@@ -22,6 +22,8 @@ interface ExportPanelProps {
   onExport: () => void;
   onCancel: () => void;
   disabled?: boolean;
+  /** True when the high-quality Mediabunny path will be used. */
+  highQuality?: boolean;
 }
 
 /** Sidebar panel for configuring and running the burned-in export. */
@@ -39,6 +41,7 @@ export function ExportPanel({
   onExport,
   onCancel,
   disabled,
+  highQuality,
 }: ExportPanelProps) {
   const rangeMs = Math.max(0, trimEndMs - trimStartMs);
 
@@ -119,8 +122,9 @@ export function ExportPanel({
       )}
 
       <p className="hint">
-        Export runs in real time (captures playback). Audio capture support varies
-        by browser.
+        {highQuality
+          ? 'Encodes an H.264 MP4 with Mediabunny — deterministic, glitch-free, with audio copied losslessly.'
+          : 'Falls back to real-time capture; audio support varies by browser.'}
       </p>
     </div>
   );

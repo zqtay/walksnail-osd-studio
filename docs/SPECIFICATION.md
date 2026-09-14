@@ -40,7 +40,7 @@ export a video with the OSD burned in.
 | 1 | Review a flight with OSD | Load `.mp4` + `.osd` + font → scrub/playback with overlay |
 | 2 | Add link telemetry panel | Additionally load `.srt` → toggle/position panel |
 | 3 | Fix A/V-OSD desync | Adjust a millisecond offset until OSD matches action |
-| 4 | Produce a shareable clip | Configure overlay → export burned-in `.mp4`/`.webm` |
+| 4 | Produce a shareable clip | Configure overlay → export burned-in `.mp4` |
 | 5 | Batch-style quick preview | Drag a folder; app auto-pairs files by basename |
 
 ---
@@ -154,7 +154,8 @@ DVR frame rate.
 
 ### 3.4 Video (`.mp4`)
 - Standard Walksnail Avatar DVR H.264/H.265 MP4. Decoded via the native
-  `<video>` element for preview and via WebCodecs for export where available.
+  `<video>` element for preview and, for export, demuxed/decoded by **Mediabunny**
+  (WebCodecs) where available.
 
 ---
 
@@ -187,17 +188,19 @@ DVR frame rate.
 
 ### 4.4 Export
 - FR-13 Export a video with OSD (and optional SRT panel) burned into frames.
-- FR-14 **Trim range:** user selects a start and end time (via numeric fields
-  and draggable in/out handles on the timeline); only that range is exported.
-  Defaults to the full clip; validated so `start < end` within clip bounds.
-- FR-15 Preferred pipeline: **WebCodecs** (`VideoDecoder`/`VideoEncoder`) +
-  `mp4-muxer`/`webm-muxer`; fallback: `ffmpeg.wasm`; last resort:
-  `MediaRecorder` capture of the canvas.
+- FR-14 **Trim range:** user selects a start and end time via a dual-thumb slider
+  in the Export panel; only that range is exported. Defaults to the full clip;
+  validated so `start < end` within clip bounds.
+- FR-15 Preferred pipeline: **Mediabunny** (WebCodecs). It demuxes the source
+  `File`, trims to range, decodes sequentially, composites the overlay per frame,
+  re-encodes **H.264 MP4**, and copies the audio track losslessly. This is
+  deterministic and glitch-free (no real-time capture or per-frame seeking).
+  Fallback: `MediaRecorder` canvas capture where WebCodecs is unavailable.
 - FR-16 Export options: resolution passthrough / downscale / **upscale**,
-  bitrate, encoder & container (`.mp4` H.264 / `.webm` VP9), whether to copy or
-  drop the audio track, and an optional **chroma-key background** (solid color
-  behind a transparent video, for compositing the OSD in an NLE).
-- FR-17 Progress UI with cancel; export runs in a Web Worker to keep UI responsive.
+  bitrate, and whether to include or drop the audio track. (Chroma-key background
+  and WebM/VP9 output are planned but not yet implemented.)
+- FR-17 Progress UI with cancel (`AbortSignal`). The Mediabunny module is
+  lazy-loaded and precached so export works offline.
 
 ### 4.5 Offline / PWA
 - FR-18 Installable PWA; service worker precaches the app shell and WASM assets.
@@ -222,9 +225,9 @@ DVR frame rate.
 - NFR-3 **Accuracy:** preview and export are pixel-identical for the OSD layer.
 - NFR-4 **Robustness:** malformed/truncated files never crash the app; the last
   valid frame is held.
-- NFR-5 **Portability:** primary target latest Chromium (WebCodecs); graceful
-  degradation (ffmpeg.wasm / MediaRecorder) elsewhere; preview-only on Safari if
-  needed.
+- NFR-5 **Portability:** primary target latest Chromium (WebCodecs, via
+  Mediabunny); graceful degradation (MediaRecorder capture) elsewhere;
+  preview-only if neither is available.
 - NFR-6 **Security:** see §7.
 
 ---
@@ -248,7 +251,7 @@ DVR frame rate.
       └───────────────────┘        └────────────────────┘
                 │
         ┌───────▼─────────────────────────────┐
-        │  Export Worker (WebCodecs/ffmpeg.wasm)│
+        │  Export (Mediabunny / MediaRecorder) │
         └───────────────────────────────────────┘
 ```
 
@@ -259,7 +262,9 @@ DVR frame rate.
 - `engine/clock.ts` — single source of truth for time + offsets; binary-search
   lookups for the active OSD frame and SRT cue.
 - `engine/renderer.ts` — deterministic canvas compositor (OSD grid + SRT panel).
-- `export/worker.ts` — frame-accurate re-encode.
+- `engine/compositor.ts` — shared `drawOverlay` used by preview and export.
+- `export/mediabunny.ts` — primary export via Mediabunny `Conversion` (lazy).
+- `export/media-recorder.ts` — fallback real-time capture export.
 - `state/` — settings + persistence.
 
 ---
@@ -267,10 +272,10 @@ DVR frame rate.
 ## 7. Security & Privacy Requirements
 - Strict CSP: `default-src 'self'`; `worker-src 'self' blob:`;
   `img-src 'self' blob: data:`; `media-src 'self' blob:`; no `connect-src`
-  to remote origins. `wasm-unsafe-eval` only if required by ffmpeg.wasm.
+  to remote origins. `wasm-unsafe-eval` only if required by a codec polyfill.
 - All file input treated as untrusted: bounds-checked binary reads, capped array
   allocations from header values, guarded against integer-overflow frame counts.
-- No `eval`/dynamic remote code. Third-party WASM pinned by hash and precached.
+- No `eval`/dynamic remote code. Bundled dependencies are precached.
 - Object URLs revoked on unload; no persistent copies of user media.
 
 ---
@@ -279,7 +284,8 @@ DVR frame rate.
 - AC-1 Loading the `docs/examples` pair reconstructs an OSD that visually matches
   the original DVR overlay across the full 0–85.7 s timeline.
 - AC-2 Parser reports `cols=53, rows=20, 575 frames` for the sample `.osd`.
-- AC-3 SRT panel shows all 11 fields with correct units and updates each cue.- AC-4 Sync offset visibly shifts the overlay and is remembered per session.
+- AC-3 SRT panel shows all 11 fields with correct units and updates each cue.
+- AC-4 Sync offset visibly shifts the overlay and is remembered per session.
 - AC-5 Export produces a playable file whose OSD layer is pixel-identical to the
   preview at matching timestamps.
 - AC-6 Setting a trim in/out range exports only that segment, with correct
@@ -293,6 +299,6 @@ DVR frame rate.
   other captures / firmwares.
 - Exact font-atlas page arrangement per variant — validate loader against real
   BF and INAV font PNGs.
-- WebCodecs H.265 decode/encode support varies; MP4/H.264 is the safe export path.
-- Audio passthrough during WebCodecs export requires demux/remux of the original
-  audio track (ffmpeg.wasm fallback covers this reliably).
+- WebCodecs H.265 decode support varies; H.264 sources are the safe path.
+  Mediabunny handles demux and lossless audio copy, so no separate remux step is
+  needed. Where WebCodecs is unavailable, the MediaRecorder fallback is used.
