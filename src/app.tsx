@@ -464,6 +464,14 @@ export function App() {
                 <option value="multi">Multiple lines</option>
               </select>
             </label>
+            <label className="toggle">
+              <input
+                type="checkbox"
+                checked={settings.srtBackground}
+                onChange={(e) => update({ srtBackground: e.target.checked })}
+              />
+              <span>Background box</span>
+            </label>
             {availableFields.length > 0 && (
               <div className="fields">
                 {availableFields.map((f) => (

@@ -48,6 +48,7 @@ export function drawOverlay(
         fields: settings.srtFields,
         anchor: settings.srtAnchor,
         layout: settings.srtLayout,
+        backgroundOpacity: settings.srtBackground ? undefined : 0,
       });
     }
   }

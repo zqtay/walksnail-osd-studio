@@ -23,6 +23,8 @@ export interface OverlaySettings {
   srtAnchor: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
   /** SRT panel layout: all fields on one line, or one per line. */
   srtLayout: 'single' | 'multi';
+  /** Show the dark background box behind the telemetry panel. */
+  srtBackground: boolean;
 }
 
 export const DEFAULT_SETTINGS: OverlaySettings = {
@@ -37,6 +39,7 @@ export const DEFAULT_SETTINGS: OverlaySettings = {
   srtFields: ['Signal', 'Delay', 'Bitrate', 'SBat', 'Distance'],
   srtAnchor: 'bottom-left',
   srtLayout: 'single',
+  srtBackground: true,
 };
 
 const STORAGE_KEY = 'walksnail-osd-studio:settings';
