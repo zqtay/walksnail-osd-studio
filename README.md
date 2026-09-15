@@ -40,8 +40,8 @@ Everything runs locally in your browser — your footage never leaves your devic
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/<your-username>/walksnail-osd.git
-cd walksnail-osd
+git clone https://github.com/zqtay/walksnail-osd-studio.git
+cd walksnail-osd-studio
 
 # 2. Install dependencies
 npm install
