@@ -29,9 +29,10 @@ export function isMediabunnySupported(): boolean {
  * re-encodes to H.264, and copies the audio track losslessly when possible.
  * This produces deterministic, glitch-free MP4 output with gapless audio.
  *
- * The `process` callback receives each input frame with its *input-file*
- * timestamp, which is exactly the timeline the `.osd`/`.srt` data is aligned to,
- * so the overlay stays in sync regardless of the trim range.
+ * The `process` callback receives each frame with an *output-relative*
+ * timestamp (the first trimmed frame starts at ~0). We add the trim `startMs`
+ * back to recover the input-file time the `.osd`/`.srt` data is aligned to, so
+ * the overlay stays in sync regardless of the trim range.
  *
  * @param sources Parsed OSD/SRT/font.
  * @param settings Overlay settings.
@@ -77,9 +78,10 @@ export async function exportWithMediabunny(
       processedWidth: width,
       processedHeight: height,
       process: (sample) => {
-        // sample.timestamp is the input-file time (seconds), which aligns with
-        // the OSD/SRT timelines.
-        const tMs = sample.timestamp * 1000;
+        // Mediabunny rebases sample timestamps to be output-relative (the first
+        // trimmed frame starts at ~0), so add the trim start back to recover the
+        // input-file time that the OSD/SRT timelines are aligned to.
+        const tMs = sample.timestamp * 1000 + startMs;
         ctx.clearRect(0, 0, width, height);
         sample.draw(ctx, 0, 0, width, height);
         drawOverlay(ctx, sources, settings, tMs, width, height);
