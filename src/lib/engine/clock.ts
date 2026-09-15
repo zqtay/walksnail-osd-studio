@@ -61,3 +61,30 @@ export function formatMs(ms: number): string {
     .toString()
     .padStart(3, '0')}`;
 }
+
+/**
+ * Parse a time string into milliseconds. Accepts the `formatMs` output
+ * (`M:SS.mmm`), longer `H:MM:SS.mmm`, and colon-less seconds (`83.4`). A value
+ * with no colon is always read as seconds. Returns `null` when the string can't
+ * be parsed.
+ */
+export function parseTimeMs(input: string): number | null {
+  const trimmed = input.trim();
+  if (trimmed === '') return null;
+
+  const sign = trimmed.startsWith('-') ? -1 : 1;
+  const body = trimmed.replace(/^[-+]/, '');
+
+  const parts = body.split(':');
+  if (parts.length > 3) return null;
+
+  let seconds = 0;
+  for (const part of parts) {
+    if (!/^\d*\.?\d*$/.test(part) || part === '' || part === '.') return null;
+    const value = Number(part);
+    if (!Number.isFinite(value)) return null;
+    seconds = seconds * 60 + value;
+  }
+
+  return sign * Math.round(seconds * 1000);
+}

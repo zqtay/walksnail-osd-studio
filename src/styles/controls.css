@@ -110,6 +110,35 @@ select {
   width: 100%;
 }
 
+.export__trim-inputs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.export__trim-inputs input {
+  flex: 1;
+  min-width: 0;
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 6px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.export__trim-inputs input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.export__trim-sep {
+  color: var(--muted);
+}
+
 .export__progress {
   display: flex;
   align-items: center;
