@@ -1,3 +1,5 @@
+import { RotateCcw } from 'lucide-react';
+
 interface SectionProps {
   title: string;
   toggle?: { checked: boolean; onChange: (v: boolean) => void };
@@ -25,7 +27,7 @@ export function Section({ title, toggle, onReset, children }: SectionProps) {
               title={`Reset ${title} to defaults`}
               aria-label={`Reset ${title} to defaults`}
             >
-              🔄
+              <RotateCcw size={14} />
             </button>
           )}
           {toggle && (

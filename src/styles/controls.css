@@ -1,4 +1,7 @@
 .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   background: var(--panel-2);
   color: var(--text);
   border: 1px solid var(--border);
@@ -106,6 +109,7 @@ select {
 }
 
 .export__go {
+  justify-content: center;
   margin-top: 12px;
   width: 100%;
 }
@@ -136,6 +140,8 @@ select {
 }
 
 .export__trim-sep {
+  display: inline-flex;
+  align-items: center;
   color: var(--muted);
 }
 

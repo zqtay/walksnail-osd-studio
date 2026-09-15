@@ -1,3 +1,4 @@
+import { SkipBack, SkipForward, Play, Pause, Volume2, VolumeX } from 'lucide-react';
 import { formatMs } from '../lib/engine/clock';
 
 interface TransportProps {
@@ -24,11 +25,16 @@ export function Transport({
 }: TransportProps) {
   return (
     <div className="transport">
-      <button className="btn" onClick={() => onStepFrame(-1)}>⏮</button>
-      <button className="btn btn--primary" onClick={onTogglePlay}>
-        {playing ? '⏸ Pause' : '▶ Play'}
+      <button className="btn" onClick={() => onStepFrame(-1)} aria-label="Previous frame">
+        <SkipBack size={16} />
       </button>
-      <button className="btn" onClick={() => onStepFrame(1)}>⏭</button>
+      <button className="btn btn--primary" onClick={onTogglePlay}>
+        {playing ? <Pause size={16} /> : <Play size={16} />}
+        {playing ? 'Pause' : 'Play'}
+      </button>
+      <button className="btn" onClick={() => onStepFrame(1)} aria-label="Next frame">
+        <SkipForward size={16} />
+      </button>
       <span className="time">
         {formatMs(current)} / {formatMs(duration)}
       </span>
@@ -43,7 +49,7 @@ export function Transport({
         </select>
       </label>
       <label className="volume">
-        {volume === 0 ? '🔇' : '🔊'}
+        {volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
         <input
           type="range"
           min={0}

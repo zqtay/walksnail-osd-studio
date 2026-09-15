@@ -32,13 +32,15 @@
 }
 
 .panel__reset {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: transparent;
   color: var(--muted);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 1px 6px;
-  font-size: 13px;
-  line-height: 1.2;
+  padding: 3px;
+  line-height: 0;
   cursor: pointer;
 }
 

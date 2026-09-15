@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { FolderOpen } from 'lucide-react';
 import { OverlayCanvas } from './components/overlay-canvas';
 import { Timeline } from './components/timeline';
 import { Transport } from './components/transport';
@@ -109,6 +110,7 @@ export function App() {
       <header className="app__header">
         <h1>Walksnail OSD Studio</h1>
         <label className="btn btn--ghost">
+          <FolderOpen size={16} />
           Open files
           <input
             type="file"

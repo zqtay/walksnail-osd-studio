@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { ArrowRight, Download } from 'lucide-react';
 import { clampMs, formatMs, parseTimeMs } from '../../lib/engine/clock';
 import { RangeSlider } from './range-slider';
 
@@ -102,7 +103,9 @@ export function ExportPanel({
               if (e.key === 'Enter') e.currentTarget.blur();
             }}
           />
-          <span className="export__trim-sep">→</span>
+          <span className="export__trim-sep" aria-hidden="true">
+            <ArrowRight size={14} />
+          </span>
           <input
             type="text"
             inputMode="decimal"
@@ -173,6 +176,7 @@ export function ExportPanel({
           onClick={onExport}
           disabled={disabled || rangeMs <= 0}
         >
+          <Download size={16} />
           Export clip
         </button>
       )}
