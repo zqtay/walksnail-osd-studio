@@ -54,7 +54,7 @@ export function useExporter({
     width: 1920,
     height: 1080,
     bitrateMbps: 40,
-    includeAudio: false,
+    includeAudio: true,
   });
   const [exporting, setExporting] = useState(false);
   const [progress, setProgress] = useState(0);
