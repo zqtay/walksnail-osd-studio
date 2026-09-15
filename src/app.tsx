@@ -8,7 +8,7 @@ import { OsdPanel } from './components/panel/osd-panel';
 import { TelemetryPanel } from './components/panel/telemetry-panel';
 import { MaskEditor } from './components/mask-editor';
 import { ExportPanel } from './components/panel/export-panel';
-import { useOverlaySettings } from './state/settings';
+import { useOverlaySettings, DEFAULT_SETTINGS } from './state/settings';
 import { useMediaLoader } from './hooks/use-media-loader';
 import { usePlayer } from './hooks/use-player';
 import { useExporter, canHighQualityExport } from './hooks/use-exporter';
@@ -49,6 +49,60 @@ export function App() {
     nativeSize,
     onError: setError,
   });
+
+  // Reset a panel's settings back to their defaults (keeping the enable toggle).
+  const resetOsd = () =>
+    update({
+      osdOffsetMs: DEFAULT_SETTINGS.osdOffsetMs,
+      osdOffsetX: DEFAULT_SETTINGS.osdOffsetX,
+      osdOffsetY: DEFAULT_SETTINGS.osdOffsetY,
+      osdScale: DEFAULT_SETTINGS.osdScale,
+      osdMask: [...DEFAULT_SETTINGS.osdMask],
+    });
+
+  const resetTelemetry = () =>
+    update({
+      srtOffsetMs: DEFAULT_SETTINGS.srtOffsetMs,
+      srtFields: [...DEFAULT_SETTINGS.srtFields],
+      srtAnchor: DEFAULT_SETTINGS.srtAnchor,
+      srtLayout: DEFAULT_SETTINGS.srtLayout,
+      srtBackground: DEFAULT_SETTINGS.srtBackground,
+      srtScale: DEFAULT_SETTINGS.srtScale,
+      srtOffsetX: DEFAULT_SETTINGS.srtOffsetX,
+      srtOffsetY: DEFAULT_SETTINGS.srtOffsetY,
+    });
+
+  const resetExport = () => {
+    exporter.resetExportUi();
+    setTrim(0, duration);
+  };
+
+  // Whether each section differs from its defaults (controls Reset visibility).
+  const osdDirty =
+    settings.osdOffsetMs !== DEFAULT_SETTINGS.osdOffsetMs ||
+    settings.osdOffsetX !== DEFAULT_SETTINGS.osdOffsetX ||
+    settings.osdOffsetY !== DEFAULT_SETTINGS.osdOffsetY ||
+    settings.osdScale !== DEFAULT_SETTINGS.osdScale ||
+    settings.osdMask.length > 0;
+
+  const telemetryDirty =
+    settings.srtOffsetMs !== DEFAULT_SETTINGS.srtOffsetMs ||
+    settings.srtAnchor !== DEFAULT_SETTINGS.srtAnchor ||
+    settings.srtLayout !== DEFAULT_SETTINGS.srtLayout ||
+    settings.srtBackground !== DEFAULT_SETTINGS.srtBackground ||
+    settings.srtScale !== DEFAULT_SETTINGS.srtScale ||
+    settings.srtOffsetX !== DEFAULT_SETTINGS.srtOffsetX ||
+    settings.srtOffsetY !== DEFAULT_SETTINGS.srtOffsetY ||
+    settings.srtFields.length !== DEFAULT_SETTINGS.srtFields.length ||
+    settings.srtFields.some((f, i) => f !== DEFAULT_SETTINGS.srtFields[i]);
+
+  const exportDirty =
+    exporter.exportUi.width !== nativeSize.w ||
+    exporter.exportUi.height !== nativeSize.h ||
+    exporter.exportUi.bitrateMbps !== 40 ||
+    exporter.exportUi.includeAudio !== true ||
+    trimStart !== 0 ||
+    trimEnd !== duration;
 
   return (
     <div className="app">
@@ -167,6 +221,7 @@ export function App() {
               checked: settings.osdEnabled,
               onChange: (v) => update({ osdEnabled: v }),
             }}
+            onReset={osdDirty ? resetOsd : undefined}
           >
             <OsdPanel
               settings={settings}
@@ -184,6 +239,7 @@ export function App() {
               checked: settings.srtEnabled,
               onChange: (v) => update({ srtEnabled: v }),
             }}
+            onReset={telemetryDirty ? resetTelemetry : undefined}
           >
             <TelemetryPanel
               settings={settings}
@@ -192,7 +248,7 @@ export function App() {
             />
           </Section>
 
-          <Section title="Export">
+          <Section title="Export" onReset={exportDirty ? resetExport : undefined}>
             <ExportPanel
               state={exporter.exportUi}
               onChange={exporter.setExportUi}

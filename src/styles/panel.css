@@ -24,15 +24,39 @@
   margin: 0 0 10px;
 }
 
+.panel__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+}
+
+.panel__reset {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-size: 13px;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.panel__reset:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
 .panel__toggle {
   width: 16px;
   height: 16px;
-  margin: 0 0 10px;
+  margin: 0;
   cursor: pointer;
 }
 
 /* Collapsed: no content, so drop the header's bottom margin. */
 .panel--collapsed .panel__head h2,
+.panel--collapsed .panel__actions,
 .panel--collapsed .panel__toggle {
   margin-bottom: 0;
 }

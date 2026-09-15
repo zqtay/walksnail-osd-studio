@@ -12,6 +12,14 @@ import type { NativeSize } from './use-player';
 export const canHighQualityExport =
   typeof VideoEncoder !== 'undefined' && typeof VideoFrame !== 'undefined';
 
+/** Default export configuration (resolution is overridden by the native size). */
+const DEFAULT_EXPORT_UI: ExportUiState = {
+  width: 1920,
+  height: 1080,
+  bitrateMbps: 40,
+  includeAudio: true,
+};
+
 interface UseExporterArgs {
   sources: OverlaySources;
   settings: OverlaySettings;
@@ -28,6 +36,7 @@ export interface UseExporter {
   exportVideoRef: React.RefObject<HTMLVideoElement>;
   exportUi: ExportUiState;
   setExportUi: (patch: Partial<ExportUiState>) => void;
+  resetExportUi: () => void;
   exporting: boolean;
   progress: number;
   runExport: () => Promise<void>;
@@ -50,12 +59,7 @@ export function useExporter({
   onError,
 }: UseExporterArgs): UseExporter {
   const exportVideoRef = useRef<HTMLVideoElement>(null);
-  const [exportUi, setExportUiState] = useState<ExportUiState>({
-    width: 1920,
-    height: 1080,
-    bitrateMbps: 40,
-    includeAudio: true,
-  });
+  const [exportUi, setExportUiState] = useState<ExportUiState>(DEFAULT_EXPORT_UI);
   const [exporting, setExporting] = useState(false);
   const [progress, setProgress] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
@@ -67,6 +71,10 @@ export function useExporter({
 
   const setExportUi = (patch: Partial<ExportUiState>) =>
     setExportUiState((prev) => ({ ...prev, ...patch }));
+
+  // Reset to defaults, keeping the resolution matched to the native size.
+  const resetExportUi = () =>
+    setExportUiState({ ...DEFAULT_EXPORT_UI, width: nativeSize.w, height: nativeSize.h });
 
   async function runExport() {
     const exportVideo = exportVideoRef.current;
@@ -137,6 +145,7 @@ export function useExporter({
     exportVideoRef,
     exportUi,
     setExportUi,
+    resetExportUi,
     exporting,
     progress,
     runExport,
