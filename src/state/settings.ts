@@ -31,6 +31,10 @@ export interface OverlaySettings {
   srtOffsetX: number;
   /** Telemetry panel vertical nudge (destination px). */
   srtOffsetY: number;
+  /** Background color drawn behind the overlay when no video is loaded. */
+  bgColor: string;
+  /** Show the background color in place of the video (even when a video is loaded). */
+  useBackground: boolean;
 }
 
 export const DEFAULT_SETTINGS: OverlaySettings = {
@@ -49,6 +53,8 @@ export const DEFAULT_SETTINGS: OverlaySettings = {
   srtScale: 1,
   srtOffsetX: 0,
   srtOffsetY: 0,
+  bgColor: '#000000',
+  useBackground: false,
 };
 
 const STORAGE_KEY = 'walksnail-osd-studio:settings';

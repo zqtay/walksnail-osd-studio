@@ -25,6 +25,12 @@ interface UseExporterArgs {
   settings: OverlaySettings;
   videoName: string | undefined;
   videoFile: File | undefined;
+  /** Base filename for the export when no video is loaded (e.g. from .osd/.srt). */
+  baseName: string;
+  /** True when OSD/SRT data is available to export without a video. */
+  hasOverlay: boolean;
+  /** Export the overlay over the background color instead of the video. */
+  preferBackground: boolean;
   trimStartMs: number;
   trimEndMs: number;
   nativeSize: NativeSize;
@@ -53,6 +59,9 @@ export function useExporter({
   settings,
   videoName,
   videoFile,
+  baseName,
+  hasOverlay,
+  preferBackground,
   trimStartMs,
   trimEndMs,
   nativeSize,
@@ -78,7 +87,7 @@ export function useExporter({
 
   async function runExport() {
     const exportVideo = exportVideoRef.current;
-    if (!videoName) return;
+    if (!videoName && !hasOverlay) return;
     setExporting(true);
     setProgress(0);
     const controller = new AbortController();
@@ -91,11 +100,14 @@ export function useExporter({
       height: exportUi.height,
       videoBitsPerSecond: exportUi.bitrateMbps * 1_000_000,
       includeAudio: exportUi.includeAudio,
+      // When the user chose the background over the video, replace the video
+      // frames with the background color while still keeping the audio track.
+      backgroundColor: preferBackground ? settings.bgColor : undefined,
     };
 
     try {
       let result;
-      if (canHighQualityExport && videoFile) {
+      if (videoFile && canHighQualityExport) {
         const { exportWithMediabunny } = await import('../lib/export/mediabunny');
         result = await exportWithMediabunny(
           sources,
@@ -105,9 +117,18 @@ export function useExporter({
           (p) => setProgress(p.fraction),
           controller.signal,
         );
-      } else if (exportVideo) {
+      } else if (videoFile && exportVideo) {
         result = await exportWithMediaRecorder(
           exportVideo,
+          sources,
+          settings,
+          exportOptions,
+          (p) => setProgress(p.fraction),
+          controller.signal,
+        );
+      } else if (hasOverlay || preferBackground) {
+        const { exportOverlayOnly } = await import('../lib/export/overlay-only');
+        result = await exportOverlayOnly(
           sources,
           settings,
           exportOptions,
@@ -119,7 +140,7 @@ export function useExporter({
       }
 
       const ext = extensionForMime(result.mimeType);
-      const base = videoName.replace(/\.[^.]+$/, '');
+      const base = (videoName ?? baseName).replace(/\.[^.]+$/, '');
       const url = URL.createObjectURL(result.blob);
       const a = document.createElement('a');
       a.href = url;

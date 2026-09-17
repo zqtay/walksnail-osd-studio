@@ -83,7 +83,13 @@ export async function exportWithMediabunny(
         // input-file time that the OSD/SRT timelines are aligned to.
         const tMs = sample.timestamp * 1000 + startMs;
         ctx.clearRect(0, 0, width, height);
-        sample.draw(ctx, 0, 0, width, height);
+        if (options.backgroundColor) {
+          // Replace the video frame with a solid background (audio is kept).
+          ctx.fillStyle = options.backgroundColor;
+          ctx.fillRect(0, 0, width, height);
+        } else {
+          sample.draw(ctx, 0, 0, width, height);
+        }
         drawOverlay(ctx, sources, settings, tMs, width, height);
         // Snapshot the canvas into a new frame (constructor copies pixels).
         return new VideoSample(canvas, {

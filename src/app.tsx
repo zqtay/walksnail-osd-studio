@@ -5,6 +5,7 @@ import { Timeline } from './components/timeline';
 import { Transport } from './components/transport';
 import { Section } from './components/panel/section';
 import { FilesPanel } from './components/panel/files-panel';
+import { BackgroundPanel } from './components/panel/background-panel';
 import { OsdPanel } from './components/panel/osd-panel';
 import { TelemetryPanel } from './components/panel/telemetry-panel';
 import { MaskEditor } from './components/mask-editor';
@@ -20,6 +21,20 @@ export function App() {
 
   const { loaded, error, setError, handleFiles, availableFields, hasVideo } =
     useMediaLoader();
+
+  // Overlay-only (video-less) preview/export: derive a synthetic duration from
+  // whichever track is longest, and a base filename for the export.
+  const overlayDurationMs = Math.max(
+    loaded.osd?.durationMs ?? 0,
+    loaded.srt?.durationMs ?? 0,
+  );
+  const hasOverlay = Boolean(loaded.osd || loaded.srt);
+  const exportBaseName =
+    loaded.videoName ?? loaded.osdName ?? loaded.srtName ?? 'overlay';
+
+  // Show the background color in place of the video when no video is loaded, or
+  // when the user has toggled it on.
+  const showBackground = !hasVideo || settings.useBackground;
 
   const {
     videoRef,
@@ -38,13 +53,16 @@ export function App() {
     changeVolume,
     setPlaybackRate,
     videoHandlers,
-  } = usePlayer(loaded.videoUrl);
+  } = usePlayer(loaded.videoUrl, overlayDurationMs);
 
   const exporter = useExporter({
     sources: { osd: loaded.osd, srt: loaded.srt, font: loaded.font },
     settings,
     videoName: loaded.videoName,
     videoFile: loaded.videoFile,
+    baseName: exportBaseName,
+    hasOverlay,
+    preferBackground: showBackground,
     trimStartMs: trimStart,
     trimEndMs: trimEnd,
     nativeSize,
@@ -131,31 +149,38 @@ export function App() {
             void handleFiles(e.dataTransfer.files);
           }}
         >
-          {!hasVideo && (
+          {!hasVideo && !hasOverlay && (
             <div className="stage__empty">
               <strong>Drop files to begin</strong>
               <span>.mp4 video · .osd overlay · .srt telemetry · .png font</span>
             </div>
           )}
 
-          {hasVideo && (
+          {(hasVideo || hasOverlay) && (
             <div className="player">
               <div className="player__frame">
-                <video
-                  ref={videoRef}
-                  src={loaded.videoUrl}
-                  className="player__video"
-                  onLoadedMetadata={videoHandlers.onLoadedMetadata}
-                  onTimeUpdate={videoHandlers.onTimeUpdate}
-                  onPlay={videoHandlers.onPlay}
-                  onPause={videoHandlers.onPause}
-                />
+                {hasVideo && (
+                  <video
+                    ref={videoRef}
+                    src={loaded.videoUrl}
+                    className="player__video"
+                    style={showBackground ? { visibility: 'hidden' } : undefined}
+                    onLoadedMetadata={videoHandlers.onLoadedMetadata}
+                    onTimeUpdate={videoHandlers.onTimeUpdate}
+                    onPlay={videoHandlers.onPlay}
+                    onPause={videoHandlers.onPause}
+                  />
+                )}
                 <OverlayCanvas
-                  video={videoEl}
+                  video={hasVideo ? videoEl : null}
                   osd={loaded.osd}
                   srt={loaded.srt}
                   font={loaded.font}
                   settings={settings}
+                  timeMs={current}
+                  width={nativeSize.w}
+                  height={nativeSize.h}
+                  background={showBackground ? settings.bgColor : undefined}
                 />
                 {maskEditing && loaded.osd && (
                   <MaskEditor
@@ -173,14 +198,16 @@ export function App() {
               </div>
 
               {/* Dedicated source element for export (muted, off-screen). */}
-              <video
-                ref={exporter.exportVideoRef}
-                src={loaded.videoUrl}
-                muted
-                playsInline
-                preload="auto"
-                style={{ display: 'none' }}
-              />
+              {hasVideo && (
+                <video
+                  ref={exporter.exportVideoRef}
+                  src={loaded.videoUrl}
+                  muted
+                  playsInline
+                  preload="auto"
+                  style={{ display: 'none' }}
+                />
+              )}
 
               <Timeline
                 duration={duration}
@@ -216,6 +243,12 @@ export function App() {
               showFontHint={Boolean(loaded.osd && !loaded.font)}
             />
           </Section>
+
+          {(hasVideo || hasOverlay) && (
+            <Section title="Background">
+              <BackgroundPanel settings={settings} update={update} hasVideo={hasVideo} />
+            </Section>
+          )}
 
           <Section
             title="OSD"
@@ -264,7 +297,7 @@ export function App() {
               progress={exporter.progress}
               onExport={() => void exporter.runExport()}
               onCancel={exporter.cancelExport}
-              disabled={!hasVideo}
+              disabled={!hasVideo && !hasOverlay}
               highQuality={canHighQualityExport}
             />
           </Section>

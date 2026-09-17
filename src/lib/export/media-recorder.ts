@@ -146,8 +146,15 @@ export async function exportWithMediaRecorder(
       const tMs = video.currentTime * 1000;
 
       // Draw the current video frame scaled to the output, then the overlay.
+      // When a background color is set, the frame is replaced by it (audio is
+      // still captured from the video's stream).
       ctx.clearRect(0, 0, width, height);
-      ctx.drawImage(video, 0, 0, width, height);
+      if (options.backgroundColor) {
+        ctx.fillStyle = options.backgroundColor;
+        ctx.fillRect(0, 0, width, height);
+      } else {
+        ctx.drawImage(video, 0, 0, width, height);
+      }
       drawOverlay(ctx, sources, settings, tMs, width, height);
       track.requestFrame();
 

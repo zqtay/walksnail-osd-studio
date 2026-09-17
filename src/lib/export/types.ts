@@ -11,6 +11,11 @@ export interface ExportOptions {
   videoBitsPerSecond: number;
   /** Include the original audio track. */
   includeAudio: boolean;
+  /**
+   * When set, the source video frames are replaced by this solid background
+   * color (the overlay is still drawn on top). Audio is preserved.
+   */
+  backgroundColor?: string;
   /** Preferred container/codec MIME (MediaRecorder path); falls back if unsupported. */
   mimeType?: string;
 }

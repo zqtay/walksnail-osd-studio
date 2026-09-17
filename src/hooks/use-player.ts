@@ -32,12 +32,22 @@ export interface UsePlayer {
   };
 }
 
+/** Default canvas size for the video-less (overlay-only) preview. */
+const SYNTHETIC_SIZE: NativeSize = { w: 1920, h: 1080 };
+
 /**
  * Owns the preview video element's transport state (time, playback, volume),
  * intrinsic size, and the export trim range. The trim range resets to the full
  * clip whenever a new video (URL) or duration is loaded.
+ *
+ * When no video is loaded but `fallbackDurationMs > 0` (e.g. only an `.osd`/
+ * `.srt` is present), the hook runs a synthetic clock so the overlay can be
+ * previewed and scrubbed without a video element.
  */
-export function usePlayer(videoUrl: string | undefined): UsePlayer {
+export function usePlayer(
+  videoUrl: string | undefined,
+  fallbackDurationMs = 0,
+): UsePlayer {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null);
   const [duration, setDuration] = useState(0);
@@ -47,9 +57,46 @@ export function usePlayer(videoUrl: string | undefined): UsePlayer {
   const [nativeSize, setNativeSize] = useState<NativeSize>({ w: 1920, h: 1080 });
   const [trimStart, setTrimStart] = useState(0);
   const [trimEnd, setTrimEnd] = useState(0);
+  const rateRef = useRef(1);
+
+  const hasVideo = Boolean(videoUrl);
 
   // Expose the element once it (re)mounts for the current source.
   useEffect(() => setVideoEl(videoRef.current), [videoUrl]);
+
+  // Synthetic-mode timeline: adopt the fallback duration and reset transport
+  // when there is no video source.
+  useEffect(() => {
+    if (hasVideo) return;
+    setDuration(fallbackDurationMs);
+    setCurrent(0);
+    setPlaying(false);
+    setTrimStart(0);
+    setTrimEnd(fallbackDurationMs);
+    setNativeSize(SYNTHETIC_SIZE);
+  }, [hasVideo, fallbackDurationMs]);
+
+  // Synthetic playback loop, advancing the clock with wall time * rate.
+  useEffect(() => {
+    if (hasVideo || !playing) return;
+    let raf = 0;
+    let last = performance.now();
+    const tick = (now: number) => {
+      const dt = (now - last) * rateRef.current;
+      last = now;
+      setCurrent((c) => {
+        const next = c + dt;
+        if (next >= duration) {
+          setPlaying(false);
+          return duration;
+        }
+        return next;
+      });
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [hasVideo, playing, duration]);
 
   function onLoadedMetadata() {
     const v = videoRef.current;
@@ -62,16 +109,27 @@ export function usePlayer(videoUrl: string | undefined): UsePlayer {
   }
 
   function seek(ms: number) {
+    const clamped = clampMs(ms, 0, duration);
     const v = videoRef.current;
-    if (!v) return;
-    v.currentTime = clampMs(ms, 0, duration) / 1000;
+    if (v) {
+      v.currentTime = clamped / 1000;
+    } else {
+      setCurrent(clamped);
+    }
   }
 
   function togglePlay() {
     const v = videoRef.current;
-    if (!v) return;
-    if (v.paused) void v.play();
-    else v.pause();
+    if (v) {
+      if (v.paused) void v.play();
+      else v.pause();
+      return;
+    }
+    // Synthetic mode: restart from the beginning if parked at the end.
+    setPlaying((p) => {
+      if (!p && current >= duration) setCurrent(0);
+      return !p;
+    });
   }
 
   function stepFrame(dir: number) {
@@ -89,6 +147,7 @@ export function usePlayer(videoUrl: string | undefined): UsePlayer {
   }
 
   function setPlaybackRate(rate: number) {
+    rateRef.current = rate;
     const v = videoRef.current;
     if (v) v.playbackRate = rate;
   }

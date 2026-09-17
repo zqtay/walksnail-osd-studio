@@ -31,6 +31,10 @@ input[type='range'] {
   accent-color: var(--accent);
 }
 
+input[type='checkbox'] {
+  cursor: pointer;
+}
+
 select {
   background: var(--panel-2);
   color: var(--text);
@@ -57,6 +61,22 @@ select {
   color: var(--text);
   font-style: normal;
   font-variant-numeric: tabular-nums;
+}
+
+.field--color {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.field--color input[type='color'] {
+  width: 44px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
 }
 
 .toggle {
