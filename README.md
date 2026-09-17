@@ -18,10 +18,13 @@ Everything runs locally in your browser — your footage never leaves your devic
 - **Link‑telemetry panel** from the `.srt` (signal, latency, bitrate,
   battery, distance, flight time…), with per-field selection.
 - **100% local & offline** — no upload, no backend. Installable as a PWA.
-- **Live overlay controls** — sync offset, position nudge, scale, and a
-  drag-to-hide **OSD element mask**.
+- **Live overlay controls** — sync offset, position nudge, scale, a
+  drag-to-hide **OSD element mask**, and drag-to-**move individual OSD cells**
+  to any grid position.
 - **Styleable telemetry** — single/multi-line layout, anchor corner,
   background box toggle, size and position.
+- **Works without a video** — load just the `.osd`/`.srt` (+ font) to preview
+  and export the overlay on its own over a chosen **background color**.
 - **Trim & export** — dual-thumb range slider selects the segment to export;
   the overlay is burned in and downloaded as an MP4.
 - **High-quality export** via [Mediabunny](https://mediabunny.dev) (WebCodecs,
@@ -68,15 +71,20 @@ Then open the printed local URL (typically `http://localhost:5173`).
 ## Usage
 
 1. Launch the app and **drag & drop** (or use *Open files*) your capture set:
-   - `.mp4` — the Walksnail DVR video
+   - `.mp4` — the Walksnail DVR video (optional — the overlay works without it)
    - `.osd` — the OSD recording
    - `.srt` — the link-telemetry track
    - `.png` — an OSD font atlas (required to draw the OSD glyphs)
 2. Files sharing a basename are **auto-paired** (e.g. `AscentG0177.*`).
 3. Adjust the **OSD** and **Telemetry** panels to taste; use the sync offsets if
    the overlay leads/lags the footage.
+   - In the **OSD** panel, **Mask cells** hides elements (e.g. the crosshair),
+     and **Move cells** lets you drag individual glyphs to a new grid position.
+   - The **Background** panel picks the color shown in place of the video and,
+     when a video is loaded, toggles between the video and that color.
 4. Set the **trim range** in the Export panel, then **Export clip** to download
-   the burned-in MP4.
+   the burned-in MP4. Without a video, the overlay is exported over the
+   background color; with a video, its audio is preserved either way.
 
 > **Note:** The OSD/telemetry streams update at ~7 Hz (they are not one sample
 > per video frame), so fast-changing values visibly “step”. This is inherent to
