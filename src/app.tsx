@@ -9,6 +9,7 @@ import { BackgroundPanel } from './components/panel/background-panel';
 import { OsdPanel } from './components/panel/osd-panel';
 import { TelemetryPanel } from './components/panel/telemetry-panel';
 import { MaskEditor } from './components/mask-editor';
+import { MoveEditor } from './components/move-editor';
 import { ExportPanel } from './components/panel/export-panel';
 import { useOverlaySettings, DEFAULT_SETTINGS } from './state/settings';
 import { useMediaLoader } from './hooks/use-media-loader';
@@ -18,6 +19,7 @@ import { useExporter, canHighQualityExport } from './hooks/use-exporter';
 export function App() {
   const [settings, update] = useOverlaySettings();
   const [maskEditing, setMaskEditing] = useState(false);
+  const [moveEditing, setMoveEditing] = useState(false);
 
   const { loaded, error, setError, handleFiles, availableFields, hasVideo } =
     useMediaLoader();
@@ -35,6 +37,13 @@ export function App() {
   // Show the background color in place of the video when no video is loaded, or
   // when the user has toggled it on.
   const showBackground = !hasVideo || settings.useBackground;
+
+  // While editing cells (move or mask), preview all glyphs regardless of the
+  // mask so hidden cells can be seen, relocated, or unmasked.
+  const overlaySettings =
+    (moveEditing || maskEditing) && settings.osdMask.length > 0
+      ? { ...settings, osdMask: [] }
+      : settings;
 
   const {
     videoRef,
@@ -77,6 +86,7 @@ export function App() {
       osdOffsetY: DEFAULT_SETTINGS.osdOffsetY,
       osdScale: DEFAULT_SETTINGS.osdScale,
       osdMask: [...DEFAULT_SETTINGS.osdMask],
+      osdMoves: [...DEFAULT_SETTINGS.osdMoves],
     });
 
   const resetTelemetry = () =>
@@ -102,7 +112,8 @@ export function App() {
     settings.osdOffsetX !== DEFAULT_SETTINGS.osdOffsetX ||
     settings.osdOffsetY !== DEFAULT_SETTINGS.osdOffsetY ||
     settings.osdScale !== DEFAULT_SETTINGS.osdScale ||
-    settings.osdMask.length > 0;
+    settings.osdMask.length > 0 ||
+    settings.osdMoves.length > 0;
 
   const telemetryDirty =
     settings.srtOffsetMs !== DEFAULT_SETTINGS.srtOffsetMs ||
@@ -176,7 +187,7 @@ export function App() {
                   osd={loaded.osd}
                   srt={loaded.srt}
                   font={loaded.font}
-                  settings={settings}
+                  settings={overlaySettings}
                   timeMs={current}
                   width={nativeSize.w}
                   height={nativeSize.h}
@@ -193,6 +204,20 @@ export function App() {
                     scale={settings.osdScale}
                     mask={settings.osdMask}
                     onChange={(m) => update({ osdMask: m })}
+                  />
+                )}
+                {moveEditing && loaded.osd && (
+                  <MoveEditor
+                    cols={loaded.osd.header.cols}
+                    rows={loaded.osd.header.rows}
+                    videoWidth={nativeSize.w}
+                    videoHeight={nativeSize.h}
+                    offsetX={settings.osdOffsetX}
+                    offsetY={settings.osdOffsetY}
+                    scale={settings.osdScale}
+                    moves={settings.osdMoves}
+                    mask={settings.osdMask}
+                    onChange={(m) => update({ osdMoves: m })}
                   />
                 )}
               </div>
@@ -263,8 +288,17 @@ export function App() {
               update={update}
               hasOsd={Boolean(loaded.osd)}
               maskEditing={maskEditing}
-              onToggleMask={() => setMaskEditing((v) => !v)}
+              onToggleMask={() => {
+                setMaskEditing((v) => !v);
+                setMoveEditing(false);
+              }}
               onClearMask={() => update({ osdMask: [] })}
+              moveEditing={moveEditing}
+              onToggleMove={() => {
+                setMoveEditing((v) => !v);
+                setMaskEditing(false);
+              }}
+              onClearMove={() => update({ osdMoves: [] })}
             />
           </Section>
 

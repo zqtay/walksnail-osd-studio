@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react';
 
+/**
+ * A single OSD cell relocation: the source cell index (row*cols+col) plus a
+ * displacement in whole grid cells (dRow, dCol). Lets individual glyphs be moved
+ * to a different grid position without changing the recording.
+ */
+export type OsdMove = [cell: number, dRow: number, dCol: number];
+
 export interface OverlaySettings {
   /** Show the OSD grid overlay. */
   osdEnabled: boolean;
@@ -17,6 +24,8 @@ export interface OverlaySettings {
   osdScale: number;
   /** Hidden OSD grid cells (row*cols+col indices) to mask out. */
   osdMask: number[];
+  /** Per-cell OSD relocations (source cell + grid-cell displacement). */
+  osdMoves: OsdMove[];
   /** SRT panel field keys to display. */
   srtFields: string[];
   /** SRT panel anchor corner. */
@@ -46,6 +55,7 @@ export const DEFAULT_SETTINGS: OverlaySettings = {
   osdOffsetY: 0,
   osdScale: 1,
   osdMask: [],
+  osdMoves: [],
   srtFields: ['Signal', 'Delay', 'Bitrate', 'SBat', 'Distance'],
   srtAnchor: 'bottom-left',
   srtLayout: 'single',

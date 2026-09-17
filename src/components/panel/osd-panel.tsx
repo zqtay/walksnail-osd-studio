@@ -9,6 +9,9 @@ interface OsdPanelProps {
   maskEditing: boolean;
   onToggleMask: () => void;
   onClearMask: () => void;
+  moveEditing: boolean;
+  onToggleMove: () => void;
+  onClearMove: () => void;
 }
 
 /** Sidebar panel for OSD overlay adjustments and masking. */
@@ -19,6 +22,9 @@ export function OsdPanel({
   maskEditing,
   onToggleMask,
   onClearMask,
+  moveEditing,
+  onToggleMove,
+  onClearMove,
 }: OsdPanelProps) {
   return (
     <>
@@ -58,29 +64,61 @@ export function OsdPanel({
         value={settings.osdOffsetY}
         onChange={(v) => update({ osdOffsetY: v })}
       />
-      <div className="mask-controls">
-        <button
-          className={`btn ${maskEditing ? 'btn--primary' : ''}`}
-          onClick={onToggleMask}
-          disabled={!hasOsd}
-        >
-          {maskEditing ? 'Done masking' : 'Edit mask'}
-        </button>
-        <button
-          className="btn"
-          onClick={onClearMask}
-          disabled={settings.osdMask.length === 0}
-        >
-          Clear
-        </button>
-        <span className="mask-controls__count">
-          {settings.osdMask.length} hidden
-        </span>
+      <div className="field">
+        <span>Move cells</span>
+        <div className="mask-controls">
+          <button
+            className={`btn ${moveEditing ? 'btn--primary' : ''}`}
+            onClick={onToggleMove}
+            disabled={!hasOsd}
+          >
+            {moveEditing ? 'Done' : 'Edit'}
+          </button>
+          <button
+            className="btn"
+            onClick={onClearMove}
+            disabled={settings.osdMoves.length === 0}
+          >
+            Clear
+          </button>
+          <span className="mask-controls__count">
+            {settings.osdMoves.length} moved
+          </span>
+        </div>
+
+      </div>
+      <div className="field">
+        <span>Mask cells</span>
+        <div className="mask-controls">
+          <button
+            className={`btn ${maskEditing ? 'btn--primary' : ''}`}
+            onClick={onToggleMask}
+            disabled={!hasOsd}
+          >
+            {maskEditing ? 'Done' : 'Edit'}
+          </button>
+          <button
+            className="btn"
+            onClick={onClearMask}
+            disabled={settings.osdMask.length === 0}
+          >
+            Clear
+          </button>
+          <span className="mask-controls__count">
+            {settings.osdMask.length} hidden
+          </span>
+        </div>
       </div>
       {maskEditing && (
         <p className="hint">
           Drag over the video to hide OSD cells; drag over hidden cells to reveal
           them.
+        </p>
+      )}
+      {moveEditing && (
+        <p className="hint">
+          Drag a cell to another grid position to relocate its glyph; drop it back
+          on its origin to reset.
         </p>
       )}
     </>

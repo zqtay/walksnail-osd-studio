@@ -32,11 +32,16 @@ export function drawOverlay(
   if (settings.osdEnabled && osd && font) {
     const frame = activeOsdFrame(osd, timeMs, settings.osdOffsetMs);
     if (frame) {
+      const moves =
+        settings.osdMoves.length > 0
+          ? new Map(settings.osdMoves.map(([cell, dr, dc]) => [cell, { dr, dc }]))
+          : undefined;
       renderOsdFrame(ctx, frame, osd.header.cols, osd.header.rows, font, width, height, {
         offsetX: settings.osdOffsetX,
         offsetY: settings.osdOffsetY,
         scale: settings.osdScale,
         mask: settings.osdMask.length > 0 ? new Set(settings.osdMask) : undefined,
+        moves,
       });
     }
   }

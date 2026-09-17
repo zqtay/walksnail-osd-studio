@@ -18,6 +18,8 @@ export interface OsdRenderOptions {
   scale?: number;
   /** Cells to skip drawing. */
   mask?: OsdMask;
+  /** Per-cell displacement (in whole grid cells) keyed by source cell index. */
+  moves?: Map<number, { dr: number; dc: number }>;
 }
 
 export interface SrtPanelOptions {
@@ -82,6 +84,7 @@ export function renderOsdFrame(
 ): void {
   const { scale, originX, originY } = computeOsdLayout(cols, rows, targetW, targetH, opts);
   const mask = opts.mask;
+  const moves = opts.moves;
   const stepX = TILE_W * scale;
   const stepY = TILE_H * scale;
 
@@ -90,8 +93,13 @@ export function renderOsdFrame(
       const cell = r * cols + c;
       const glyph = frame.glyphs[cell];
       if (glyph === OSD_GLYPH_SPACE) continue;
-      if (mask && mask.has(cell)) continue;
-      font.draw(ctx, originX + c * stepX, originY + r * stepY, glyph, scale);
+      // Apply the move first, then evaluate the mask against the destination
+      // position so masking hides cells by where they end up drawn.
+      const move = moves?.get(cell);
+      const dr = move ? move.dr : 0;
+      const dc = move ? move.dc : 0;
+      if (mask && mask.has((r + dr) * cols + (c + dc))) continue;
+      font.draw(ctx, originX + (c + dc) * stepX, originY + (r + dr) * stepY, glyph, scale);
     }
   }
 }
