@@ -156,6 +156,8 @@ DVR frame rate.
 - Standard Walksnail Avatar DVR H.264/H.265 MP4. Decoded via the native
   `<video>` element for preview and, for export, demuxed/decoded by **Mediabunny**
   (WebCodecs) where available.
+- DVR files are full range BT.601; exports are BT.709 limited range. See
+  [COLOR.md](COLOR.md) for the color pipeline and player quirks.
 
 ---
 

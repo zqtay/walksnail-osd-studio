@@ -2,7 +2,7 @@ import {
   Output,
   Mp4OutputFormat,
   BufferTarget,
-  CanvasSource,
+  VideoSampleSource,
   getFirstEncodableVideoCodec,
 } from 'mediabunny';
 import type { OverlaySettings } from '../../state/settings';
@@ -12,6 +12,7 @@ import {
   pickMimeType,
 } from './media-recorder';
 import type { ExportOptions, ExportProgress, ExportResult } from './types';
+import { canvasToVideoSample } from './yuv';
 
 /** Frame rate used to render the synthetic (video-less) overlay clip. */
 const OVERLAY_FPS = 30;
@@ -29,7 +30,7 @@ function isWebCodecsSupported(): boolean {
  * rendered over the configured background color. Produces a fixed-fps clip whose
  * length matches the trim range.
  *
- * Prefers the deterministic WebCodecs path (Mediabunny `CanvasSource` -> MP4)
+ * Prefers the deterministic WebCodecs path (Mediabunny `VideoSampleSource` -> MP4)
  * and falls back to a real-time MediaRecorder capture when WebCodecs is absent.
  *
  * The OSD/SRT timelines are file-relative, so each rendered frame's overlay is
@@ -66,7 +67,7 @@ async function exportOverlayWebCodecs(
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
-  const ctx = canvas.getContext('2d', { alpha: false });
+  const ctx = canvas.getContext('2d', { alpha: false, willReadFrequently: true });
   if (!ctx) throw new Error('Could not create a 2D drawing context.');
 
   const output = new Output({ format: new Mp4OutputFormat(), target: new BufferTarget() });
@@ -75,7 +76,7 @@ async function exportOverlayWebCodecs(
       width,
       height,
     })) ?? 'avc';
-  const source = new CanvasSource(canvas, { codec, bitrate: videoBitsPerSecond });
+  const source = new VideoSampleSource({ codec, bitrate: videoBitsPerSecond });
   output.addVideoTrack(source);
   await output.start();
 
@@ -93,7 +94,12 @@ async function exportOverlayWebCodecs(
       ctx.fillRect(0, 0, width, height);
       drawOverlay(ctx, sources, settings, tMs, width, height);
 
-      await source.add(i * frameDurSec, frameDurSec);
+      const sample = canvasToVideoSample(ctx, i * frameDurSec, frameDurSec);
+      try {
+        await source.add(sample);
+      } finally {
+        sample.close();
+      }
       onProgress?.({
         fraction: (i + 1) / frameCount,
         elapsedMs: ((i + 1) / OVERLAY_FPS) * 1000,

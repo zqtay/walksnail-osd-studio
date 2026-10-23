@@ -7,11 +7,11 @@ import {
   BufferTarget,
   Conversion,
   ConversionCanceledError,
-  VideoSample,
 } from 'mediabunny';
 import type { OverlaySettings } from '../../state/settings';
 import { drawOverlay, type OverlaySources } from '../engine/compositor';
 import type { ExportOptions, ExportProgress, ExportResult } from './types';
+import { canvasToVideoSample } from './yuv';
 
 /**
  * True if the browser can encode video with WebCodecs, which Mediabunny needs
@@ -64,7 +64,7 @@ export async function exportWithMediabunny(
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
-  const ctx = canvas.getContext('2d', { alpha: false });
+  const ctx = canvas.getContext('2d', { alpha: false, willReadFrequently: true });
   if (!ctx) throw new Error('Could not create a 2D drawing context.');
 
   const conversion = await Conversion.init({
@@ -91,11 +91,8 @@ export async function exportWithMediabunny(
           sample.draw(ctx, 0, 0, width, height);
         }
         drawOverlay(ctx, sources, settings, tMs, width, height);
-        // Snapshot the canvas into a new frame (constructor copies pixels).
-        return new VideoSample(canvas, {
-          timestamp: sample.timestamp,
-          duration: sample.duration,
-        });
+        // Snapshot the canvas as BT.709 limited-range YUV to match the source.
+        return canvasToVideoSample(ctx, sample.timestamp, sample.duration);
       },
     },
     audio: options.includeAudio ? {} : { discard: true },
