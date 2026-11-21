@@ -57,6 +57,12 @@ select {
   justify-content: space-between;
 }
 
+/* Small aside on the right of a field label. */
+.field__note {
+  font-size: 11px;
+  opacity: 0.75;
+}
+
 .field em {
   color: var(--text);
   font-style: normal;

@@ -44,10 +44,55 @@ export function haversineM(lat1: number, lon1: number, lat2: number, lon2: numbe
   return 2 * EARTH_RADIUS_M * Math.asin(Math.min(1, Math.sqrt(a)));
 }
 
-/** Format a distance for on-map labels: `85 m`, `1.24 km`, `12.5 km`. */
-export function formatDistance(meters: number): string {
+export type DistanceUnits = 'metric' | 'imperial';
+
+const FOOT_M = 0.3048;
+const MILE_M = 1609.344;
+const MILE_FT = 5280;
+
+/**
+ * Format a distance for on-map labels. Metric: `85 m`, `1.24 km`, `12.5 km`.
+ * Imperial: `280 ft` below 1000 ft, then `1.24 mi`, `12.5 mi`.
+ */
+export function formatDistance(meters: number, units: DistanceUnits = 'metric'): string {
   if (!Number.isFinite(meters) || meters < 0) return '—';
+  if (units === 'imperial') {
+    const feet = meters / FOOT_M;
+    if (feet < 1000) return `${Math.round(feet)} ft`;
+    const mi = meters / MILE_M;
+    return `${mi < 10 ? mi.toFixed(2) : mi.toFixed(1)} mi`;
+  }
   if (meters < 1000) return `${Math.round(meters)} m`;
   const km = meters / 1000;
   return `${km < 10 ? km.toFixed(2) : km.toFixed(1)} km`;
 }
+
+/** Largest 1, 2 or 5 × 10^n not exceeding `max` (at least 1). */
+function roundDown125(max: number): number {
+  if (!(max >= 1)) return 1;
+  const pow = 10 ** Math.floor(Math.log10(max));
+  return ([5, 2, 1].find((k) => k * pow <= max) ?? 1) * pow;
+}
+
+/**
+ * Longest "round" distance not exceeding `maxMeters`, for a map scale bar,
+ * with its label. Metric: meters, then km ("50 m", "2 km"). Imperial: feet,
+ * then miles once more than a mile fits ("200 ft", "2 mi").
+ */
+export function niceScaleLength(
+  maxMeters: number,
+  units: DistanceUnits = 'metric',
+): { meters: number; label: string } {
+  if (units === 'imperial') {
+    const maxFeet = maxMeters / FOOT_M;
+    if (maxFeet > MILE_FT) {
+      const miles = roundDown125(maxMeters / MILE_M);
+      return { meters: miles * MILE_M, label: `${miles} mi` };
+    }
+    const feet = roundDown125(maxFeet);
+    return { meters: feet * FOOT_M, label: `${feet} ft` };
+  }
+  const meters = roundDown125(maxMeters);
+  return { meters, label: meters >= 1000 ? `${meters / 1000} km` : `${meters} m` };
+}
+

@@ -126,3 +126,15 @@
   font-size: 12px;
   color: var(--accent);
 }
+
+/* Group label inside a panel (e.g. Map > Trail). */
+.panel__subhead {
+  margin: 16px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}

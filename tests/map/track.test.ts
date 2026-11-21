@@ -6,7 +6,13 @@ import {
   trailPolylines,
 } from '../../src/lib/map/track';
 import type { GpsPoint, GpsTrack } from '../../src/lib/map/gps';
-import { formatDistance, haversineM, latToWorldY, worldYToLat } from '../../src/lib/map/geo';
+import {
+  formatDistance,
+  haversineM,
+  latToWorldY,
+  niceScaleLength,
+  worldYToLat,
+} from '../../src/lib/map/geo';
 
 /** Straight northward flight with alternating east/west jitter. */
 function jittery(n: number): GpsPoint[] {
@@ -33,6 +39,11 @@ describe('geo', () => {
     expect(formatDistance(85.4)).toBe('85 m');
     expect(formatDistance(1240)).toBe('1.24 km');
     expect(formatDistance(12_500)).toBe('12.5 km');
+    expect(formatDistance(85.4, 'imperial')).toBe('280 ft');
+    expect(formatDistance(304, 'imperial')).toBe('997 ft');
+    expect(formatDistance(2000, 'imperial')).toBe('1.24 mi');
+    expect(formatDistance(20_000, 'imperial')).toBe('12.4 mi');
+    expect(formatDistance(-1, 'imperial')).toBe('—');
   });
 });
 
@@ -137,3 +148,28 @@ describe('trailPolylines', () => {
     expectPoints(future, [at(0), at(0), at(1), at(2), at(3)]);
   });
 });
+
+describe('niceScaleLength', () => {
+  it('picks the longest 1/2/5 step that fits', () => {
+    expect(niceScaleLength(73)).toEqual({ meters: 50, label: '50 m' });
+    expect(niceScaleLength(199)).toEqual({ meters: 100, label: '100 m' });
+    expect(niceScaleLength(200)).toEqual({ meters: 200, label: '200 m' });
+    expect(niceScaleLength(4300)).toEqual({ meters: 2000, label: '2 km' });
+    expect(niceScaleLength(9.9)).toEqual({ meters: 5, label: '5 m' });
+  });
+
+  it('uses feet, then miles once more than a mile fits (imperial)', () => {
+    const ft = (m: number) => niceScaleLength(m, 'imperial');
+    expect(ft(73)).toEqual({ meters: 200 * 0.3048, label: '200 ft' }); // 239.5 ft
+    expect(ft(1000).label).toBe('2000 ft'); // 3281 ft, under a mile
+    expect(ft(1700)).toEqual({ meters: 1609.344, label: '1 mi' }); // 1.06 mi
+    expect(ft(5000)).toEqual({ meters: 2 * 1609.344, label: '2 mi' }); // 3.1 mi
+    expect(ft(0.1).label).toBe('1 ft');
+  });
+
+  it('never returns less than 1 m', () => {
+    expect(niceScaleLength(0.3).meters).toBe(1);
+    expect(niceScaleLength(NaN).meters).toBe(1);
+  });
+});
+

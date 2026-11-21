@@ -74,6 +74,12 @@ export interface OverlaySettings {
   mapShowHome: boolean;
   /** Label the home point with the drone's distance from it. */
   mapShowHomeDistance: boolean;
+  /** Draw a distance scale bar on the map. */
+  mapShowScale: boolean;
+  /** Draw the tile provider's credit line on the map. */
+  mapShowCredit: boolean;
+  /** Distance units for the scale bar and home distance: m/km or ft/mi. */
+  mapUnits: 'metric' | 'imperial';
   /** Draw the not-yet-flown part of the trail faintly. */
   mapFutureTrail: boolean;
   /** Trail color. */
@@ -126,6 +132,9 @@ export const DEFAULT_SETTINGS: OverlaySettings = {
   mapOpacity: 0.9,
   mapShowHome: true,
   mapShowHomeDistance: true,
+  mapShowScale: true,
+  mapShowCredit: true,
+  mapUnits: 'metric',
   mapFutureTrail: true,
   mapTrailColor: '#ff4d4f',
   mapHeading: 'numeric',
@@ -149,6 +158,9 @@ export const MAP_SETTING_KEYS = [
   'mapOpacity',
   'mapShowHome',
   'mapShowHomeDistance',
+  'mapShowScale',
+  'mapShowCredit',
+  'mapUnits',
   'mapFutureTrail',
   'mapTrailColor',
   'mapHeading',

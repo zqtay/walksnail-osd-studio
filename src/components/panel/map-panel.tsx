@@ -3,7 +3,7 @@ import { Slider } from './slider';
 import type { OverlaySettings } from '../../state/settings';
 import type { GpsTrack } from '../../lib/map/gps';
 import { resolveHeading } from '../../lib/map/heading';
-import { TILE_PROVIDERS, type TileProvider } from '../../lib/map/tiles';
+import { TILE_PROVIDERS, tileProviderFor, type TileProvider } from '../../lib/map/tiles';
 import { loadLocalVersions, type WaybackRelease } from '../../lib/map/wayback';
 
 interface MapPanelProps {
@@ -75,8 +75,13 @@ export function MapPanel({ settings, update, hasOsd, gps }: MapPanelProps) {
         {gps.points.length} fixes over {durationS}s · {gps.source}
         {gps.homeSource === 'arming' ? ' · home set at arming' : ' · home = first fix'}
       </p>
+
+      <h3 className="panel__subhead">Map style</h3>
       <label className="field">
-        <span>Map tiles</span>
+        <span>
+          Map tiles
+          {settings.mapTiles !== 'none' && <small className="field__note">needs internet</small>}
+        </span>
         <select
           value={settings.mapTiles}
           onChange={(e) => update({ mapTiles: e.target.value as OverlaySettings['mapTiles'] })}
@@ -98,14 +103,40 @@ export function MapPanel({ settings, update, hasOsd, gps }: MapPanelProps) {
           <option value="none">None (offline)</option>
         </select>
       </label>
-      {settings.mapTiles !== 'none' && (
-        <p className="hint">Map tiles need an internet connection.</p>
-      )}
       {isSatellite && (
         <ImageryDatePicker settings={settings} update={update} state={pastImagery} />
       )}
+      <Slider
+        label="Opacity"
+        suffix="%"
+        min={0}
+        max={100}
+        step={1}
+        value={Math.round(settings.mapOpacity * 100)}
+        onChange={(v) => update({ mapOpacity: v / 100 })}
+      />
+      {settings.mapTiles !== 'none' && (
+        <>
+          <label className="toggle">
+            <input
+              type="checkbox"
+              checked={settings.mapShowCredit}
+              onChange={(e) => update({ mapShowCredit: e.target.checked })}
+            />
+            <span>Show tile credit</span>
+          </label>
+          {!settings.mapShowCredit && (
+            <p className="hint">
+              The tile providers require credit when you publish the video, e.g. in its
+              description: {tileProviderFor(settings)?.attribution}
+            </p>
+          )}
+        </>
+      )}
+
+      <h3 className="panel__subhead">View</h3>
       <label className="field">
-        <span>View</span>
+        <span>Mode</span>
         <select
           value={settings.mapMode}
           onChange={(e) => update({ mapMode: e.target.value as OverlaySettings['mapMode'] })}
@@ -114,53 +145,6 @@ export function MapPanel({ settings, update, hasOsd, gps }: MapPanelProps) {
           <option value="overview">Whole trail</option>
         </select>
       </label>
-      <label className="field">
-        <span>Shape</span>
-        <select
-          value={settings.mapShape}
-          onChange={(e) => update({ mapShape: e.target.value as OverlaySettings['mapShape'] })}
-        >
-          <option value="rect">Rectangle</option>
-          <option value="circle">Circle</option>
-        </select>
-      </label>
-      <label className="field">
-        <span>Arrow heading</span>
-        <select
-          value={headingSource}
-          onChange={(e) =>
-            update({ mapHeading: e.target.value as OverlaySettings['mapHeading'] })
-          }
-        >
-          <option value="numeric" disabled={!gps.headings.numeric}>
-            Numerical heading{missing('numeric')}
-          </option>
-          <option value="compass" disabled={!gps.headings.compass}>
-            Compass{missing('compass')}
-          </option>
-          <option value="trail">None (infer by trail)</option>
-        </select>
-      </label>
-      <Slider
-        label="Size"
-        suffix="%"
-        min={8}
-        max={90}
-        step={1}
-        value={Math.round(settings.mapSize * 100)}
-        onChange={(v) => update({ mapSize: v / 100 })}
-      />
-      {settings.mapShape === 'rect' && (
-        <Slider
-          label="Aspect"
-          suffix=":1"
-          min={0.5}
-          max={2.5}
-          step={0.05}
-          value={settings.mapAspect}
-          onChange={(v) => update({ mapAspect: v })}
-        />
-      )}
       <label className="toggle">
         <input
           type="checkbox"
@@ -187,8 +171,68 @@ export function MapPanel({ settings, update, hasOsd, gps }: MapPanelProps) {
           onChange={(v) => update({ mapZoom: v })}
         />
       )}
+
+      <h3 className="panel__subhead">Overlay</h3>
+      <label className="field">
+        <span>Shape</span>
+        <select
+          value={settings.mapShape}
+          onChange={(e) => update({ mapShape: e.target.value as OverlaySettings['mapShape'] })}
+        >
+          <option value="rect">Rectangle</option>
+          <option value="circle">Circle</option>
+        </select>
+      </label>
       <Slider
-        label="Trail smoothing"
+        label="Size"
+        suffix="%"
+        min={8}
+        max={90}
+        step={1}
+        value={Math.round(settings.mapSize * 100)}
+        onChange={(v) => update({ mapSize: v / 100 })}
+      />
+      {settings.mapShape === 'rect' && (
+        <Slider
+          label="Aspect"
+          suffix=":1"
+          min={0.5}
+          max={2.5}
+          step={0.05}
+          value={settings.mapAspect}
+          onChange={(v) => update({ mapAspect: v })}
+        />
+      )}
+      <label className="field">
+        <span>Units</span>
+        <select
+          value={settings.mapUnits}
+          onChange={(e) => update({ mapUnits: e.target.value as OverlaySettings['mapUnits'] })}
+        >
+          <option value="metric">Metric (m, km)</option>
+          <option value="imperial">Imperial (ft, mi)</option>
+        </select>
+      </label>
+      <label className="toggle">
+        <input
+          type="checkbox"
+          checked={settings.mapShowScale}
+          onChange={(e) => update({ mapShowScale: e.target.checked })}
+        />
+        <span>Show scale bar</span>
+      </label>
+
+      <h3 className="panel__subhead">Trail</h3>
+      <label className="field">
+        <span>Color</span>
+        <input
+          type="color"
+          value={settings.mapTrailColor}
+          onChange={(e) => update({ mapTrailColor: e.target.value })}
+        />
+      </label>
+      <Slider
+        label="Smoothing"
         suffix="%"
         min={0}
         max={100}
@@ -197,7 +241,7 @@ export function MapPanel({ settings, update, hasOsd, gps }: MapPanelProps) {
         onChange={(v) => update({ mapSmoothing: v })}
       />
       <Slider
-        label="Trail length"
+        label="Length"
         suffix="s"
         min={0}
         max={300}
@@ -206,22 +250,32 @@ export function MapPanel({ settings, update, hasOsd, gps }: MapPanelProps) {
         onChange={(v) => update({ mapTrailSeconds: v })}
         format={(v) => (v === 0 ? 'All' : `last ${v}s`)}
       />
-      <Slider
-        label="Map opacity"
-        suffix="%"
-        min={0}
-        max={100}
-        step={1}
-        value={Math.round(settings.mapOpacity * 100)}
-        onChange={(v) => update({ mapOpacity: v / 100 })}
-      />
-      <label className="field">
-        <span>Trail color</span>
+      <label className="toggle">
         <input
-          type="color"
-          value={settings.mapTrailColor}
-          onChange={(e) => update({ mapTrailColor: e.target.value })}
+          type="checkbox"
+          checked={settings.mapFutureTrail}
+          onChange={(e) => update({ mapFutureTrail: e.target.checked })}
         />
+        <span>Show upcoming path</span>
+      </label>
+
+      <h3 className="panel__subhead">Markers</h3>
+      <label className="field">
+        <span>Arrow heading</span>
+        <select
+          value={headingSource}
+          onChange={(e) =>
+            update({ mapHeading: e.target.value as OverlaySettings['mapHeading'] })
+          }
+        >
+          <option value="numeric" disabled={!gps.headings.numeric}>
+            Numerical heading{missing('numeric')}
+          </option>
+          <option value="compass" disabled={!gps.headings.compass}>
+            Compass{missing('compass')}
+          </option>
+          <option value="trail">None (infer by trail)</option>
+        </select>
       </label>
       <label className="toggle">
         <input
@@ -239,14 +293,6 @@ export function MapPanel({ settings, update, hasOsd, gps }: MapPanelProps) {
           onChange={(e) => update({ mapShowHomeDistance: e.target.checked })}
         />
         <span>Show home distance</span>
-      </label>
-      <label className="toggle">
-        <input
-          type="checkbox"
-          checked={settings.mapFutureTrail}
-          onChange={(e) => update({ mapFutureTrail: e.target.checked })}
-        />
-        <span>Show upcoming path</span>
       </label>
     </>
   );
@@ -292,7 +338,7 @@ function ImageryDatePicker({ settings, update, state }: ImageryDatePickerProps) 
         {state?.status === 'error' && 'Couldn\'t load past imagery dates.'}
         {state?.status === 'ready' &&
           (versions.length > 0
-            ? `${versions.length} captures of the home point from Esri Wayback, by release date (the imagery may be older).`
+            ? `${versions.length} past captures of this area. Dates are Esri releases; the imagery may be older.`
             : 'No past imagery found for this area.')}
       </p>
     </>

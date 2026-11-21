@@ -1,6 +1,6 @@
 import type { OverlaySettings } from '../../state/settings';
 import type { GpsTrack } from './gps';
-import { formatDistance, haversineM } from './geo';
+import { formatDistance, haversineM, niceScaleLength, type DistanceUnits } from './geo';
 import {
   PARENT_FALLBACK_LEVELS,
   tileProviderFor,
@@ -39,6 +39,9 @@ export type MapRenderSettings = Pick<
   | 'mapOpacity'
   | 'mapShowHome'
   | 'mapShowHomeDistance'
+  | 'mapShowScale'
+  | 'mapShowCredit'
+  | 'mapUnits'
   | 'mapFutureTrail'
   | 'mapTrailColor'
   | 'mapHeading'
@@ -117,11 +120,18 @@ export function renderMap(
     if (home.onEdge) drawHomeEdge(ctx, rect, home.x, home.y, u);
     if (s.mapShowHomeDistance) {
       const dist = haversineM(drone.lat, drone.lon, prepared.home.lat, prepared.home.lon);
-      drawHomeDistance(ctx, s.mapShape, rect, home, formatDistance(dist), u);
+      drawHomeDistance(ctx, s.mapShape, rect, home, formatDistance(dist, s.mapUnits), u);
     }
   }
 
-  if (provider) drawAttribution(ctx, s.mapShape, rect, provider.attribution);
+  const credit =
+    provider && s.mapShowCredit
+      ? drawAttribution(ctx, s.mapShape, rect, provider.attribution)
+      : undefined;
+  if (s.mapShowScale) {
+    const metersPerPx = prepared.metersPerUnit / view.unit;
+    drawScaleBar(ctx, s.mapShape, rect, metersPerPx, s.mapUnits, credit, u);
+  }
   ctx.restore();
 
   // Border.
@@ -395,7 +405,90 @@ function boxFitsShape(
   return xs[0] >= rect.x && xs[1] <= rect.x + rect.w && ys[0] >= rect.y && ys[1] <= rect.y + rect.h;
 }
 
-function drawAttribution(ctx: Ctx2D, shape: 'rect' | 'circle', rect: MapRect, text: string) {
+interface Box {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/**
+ * Scale bar: bottom-left on a rectangle (lifted above the credit line if they
+ * would overlap), centered above the credit line on a circle.
+ */
+function drawScaleBar(
+  ctx: Ctx2D,
+  shape: 'rect' | 'circle',
+  rect: MapRect,
+  metersPerPx: number,
+  units: DistanceUnits,
+  credit: Box | undefined,
+  u: number,
+) {
+  const { meters, label } = niceScaleLength(rect.w * 0.3 * metersPerPx, units);
+  const barW = meters / metersPerPx;
+  const fontPx = Math.max(9, Math.round(10 * u));
+  const tick = 4 * u;
+  const gap = 2 * u;
+  const h = fontPx + gap + tick; // label above, bar at the bottom
+
+  ctx.save();
+  ctx.font = `600 ${fontPx}px system-ui, sans-serif`;
+  const w = Math.max(barW, ctx.measureText(label).width);
+
+  let left: number;
+  let bottom: number;
+  if (shape === 'circle') {
+    left = rect.x + rect.w / 2 - barW / 2;
+    bottom = credit ? credit.y - 3 * u : rect.y + rect.h * 0.88;
+  } else {
+    const inset = 10 * u;
+    left = rect.x + inset;
+    bottom = rect.y + rect.h - inset;
+    if (credit && credit.x < left + w + 4 * u && credit.y < bottom) {
+      bottom = credit.y - 3 * u;
+    }
+  }
+  const top = bottom - h;
+  const labelX = shape === 'circle' ? left + barW / 2 : left;
+
+  // Bar with end ticks: dark halo first, then white on top.
+  const path = () => {
+    ctx.beginPath();
+    ctx.moveTo(left, bottom - tick);
+    ctx.lineTo(left, bottom);
+    ctx.lineTo(left + barW, bottom);
+    ctx.lineTo(left + barW, bottom - tick);
+  };
+  ctx.lineJoin = 'miter';
+  ctx.lineCap = 'square';
+  path();
+  ctx.lineWidth = Math.max(3, 4 * u);
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
+  ctx.stroke();
+  path();
+  ctx.lineWidth = Math.max(1, 1.6 * u);
+  ctx.strokeStyle = '#ffffff';
+  ctx.stroke();
+
+  ctx.textAlign = shape === 'circle' ? 'center' : 'left';
+  ctx.textBaseline = 'top';
+  ctx.lineWidth = Math.max(2, 3 * u);
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
+  ctx.strokeText(label, labelX, top);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(label, labelX, top);
+  ctx.restore();
+}
+
+/** Draw the tile credit line; returns its box so other labels can avoid it. */
+function drawAttribution(
+  ctx: Ctx2D,
+  shape: 'rect' | 'circle',
+  rect: MapRect,
+  text: string,
+): Box {
   let fontPx = Math.max(8, rect.h * 0.032);
   ctx.save();
   ctx.font = `${fontPx}px system-ui, sans-serif`;
@@ -427,12 +520,14 @@ function drawAttribution(ctx: Ctx2D, shape: 'rect' | 'circle', rect: MapRect, te
     x = rect.x + rect.w - tw - pad * 2;
     y = rect.y + rect.h - fontPx - pad;
   }
+  const box = { x: x - pad, y: y - pad * 0.5, w: tw + pad * 2, h: fontPx + pad };
   ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
-  ctx.fillRect(x - pad, y - pad * 0.5, tw + pad * 2, fontPx + pad);
+  ctx.fillRect(box.x, box.y, box.w, box.h);
   ctx.fillStyle = '#222';
   ctx.textBaseline = 'top';
   ctx.fillText(text, x, y);
   ctx.restore();
+  return box;
 }
 
 function clipShape(ctx: Ctx2D, shape: 'rect' | 'circle', rect: MapRect, radius: number) {
