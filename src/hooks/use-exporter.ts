@@ -5,7 +5,6 @@ import {
 } from '../lib/export/media-recorder';
 import type { OverlaySources } from '../lib/engine/compositor';
 import { collectMapTiles } from '../lib/map/map-renderer';
-import { TILE_PROVIDERS } from '../lib/map/tiles';
 import type { OverlaySettings } from '../state/settings';
 import type { ExportUiState } from '../components/panel/export-panel';
 import type { NativeSize } from './use-player';
@@ -187,7 +186,6 @@ export function useExporter({
     if (keys.length === 0) return;
     setStatus(`Downloading map tiles 0/${keys.length}…`);
     const { failed } = await tiles.prefetch(
-      TILE_PROVIDERS[settings.mapTiles],
       keys,
       signal,
       (done, total) => setStatus(`Downloading map tiles ${done}/${total}…`),

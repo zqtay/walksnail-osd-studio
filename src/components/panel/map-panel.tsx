@@ -1,7 +1,10 @@
+import { useEffect, useState } from 'react';
 import { Slider } from './slider';
 import type { OverlaySettings } from '../../state/settings';
 import type { GpsTrack } from '../../lib/map/gps';
 import { resolveHeading } from '../../lib/map/heading';
+import { TILE_PROVIDERS, type TileProvider } from '../../lib/map/tiles';
+import { loadLocalVersions, type WaybackRelease } from '../../lib/map/wayback';
 
 interface MapPanelProps {
   settings: OverlaySettings;
@@ -12,8 +15,39 @@ interface MapPanelProps {
   gps?: GpsTrack;
 }
 
+const providersIn = (category: TileProvider['category']) =>
+  Object.values(TILE_PROVIDERS).filter((p) => p.category === category);
+
+type ImageryState =
+  | { status: 'loading' }
+  | { status: 'ready'; versions: WaybackRelease[] }
+  | { status: 'error' };
+
+/** Past satellite captures at a location (Esri Wayback), fetched on demand. */
+function usePastImagery(lat: number, lon: number, enabled: boolean): ImageryState | undefined {
+  const [state, setState] = useState<ImageryState>();
+  useEffect(() => {
+    if (!enabled) return;
+    let live = true;
+    setState({ status: 'loading' });
+    loadLocalVersions(lat, lon).then(
+      (versions) => live && setState({ status: 'ready', versions }),
+      () => live && setState({ status: 'error' }),
+    );
+    return () => {
+      live = false;
+    };
+  }, [lat, lon, enabled]);
+  return enabled ? state : undefined;
+}
+
 /** Sidebar panel for the GPS map overlay. */
 export function MapPanel({ settings, update, hasOsd, gps }: MapPanelProps) {
+  const isSatellite =
+    settings.mapTiles !== 'none' && TILE_PROVIDERS[settings.mapTiles].category === 'satellite';
+  const anchor = gps ? (gps.home ?? gps.points[0]) : undefined;
+  const pastImagery = usePastImagery(anchor?.lat ?? 0, anchor?.lon ?? 0, !!anchor && isSatellite);
+
   if (!hasOsd) {
     return <p className="hint">Load an .osd recorded with GPS coordinates on screen.</p>;
   }
@@ -47,13 +81,28 @@ export function MapPanel({ settings, update, hasOsd, gps }: MapPanelProps) {
           value={settings.mapTiles}
           onChange={(e) => update({ mapTiles: e.target.value as OverlaySettings['mapTiles'] })}
         >
-          <option value="map">Street map</option>
-          <option value="satellite">Satellite</option>
+          <optgroup label="Map">
+            {providersIn('map').map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label}
+              </option>
+            ))}
+          </optgroup>
+          <optgroup label="Satellite">
+            {providersIn('satellite').map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label}
+              </option>
+            ))}
+          </optgroup>
           <option value="none">None (offline)</option>
         </select>
       </label>
       {settings.mapTiles !== 'none' && (
         <p className="hint">Map tiles need an internet connection.</p>
+      )}
+      {isSatellite && (
+        <ImageryDatePicker settings={settings} update={update} state={pastImagery} />
       )}
       <label className="field">
         <span>View</span>
@@ -190,6 +239,53 @@ export function MapPanel({ settings, update, hasOsd, gps }: MapPanelProps) {
         />
         <span>Show upcoming path</span>
       </label>
+    </>
+  );
+}
+
+interface ImageryDatePickerProps {
+  settings: OverlaySettings;
+  update: (patch: Partial<OverlaySettings>) => void;
+  state?: ImageryState;
+}
+
+/** Choose the latest satellite imagery or a past capture of the flight area. */
+function ImageryDatePicker({ settings, update, state }: ImageryDatePickerProps) {
+  const versions = state?.status === 'ready' ? state.versions : [];
+  // Keep a saved release selectable even if it isn't listed for this area.
+  const options =
+    settings.mapImagery && !versions.some((v) => v.id === settings.mapImagery)
+      ? [{ id: settings.mapImagery, date: settings.mapImageryDate || 'Saved capture' }, ...versions]
+      : versions;
+
+  return (
+    <>
+      <label className="field">
+        <span>Imagery date</span>
+        <select
+          value={settings.mapImagery}
+          onChange={(e) => {
+            const id = Number(e.target.value);
+            const date = options.find((v) => v.id === id)?.date ?? '';
+            update({ mapImagery: id, mapImageryDate: id ? date : '' });
+          }}
+        >
+          <option value={0}>Latest</option>
+          {options.map((v) => (
+            <option key={v.id} value={v.id}>
+              {v.date}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="hint">
+        {state?.status === 'loading' && 'Finding past imagery of this area…'}
+        {state?.status === 'error' && 'Couldn\'t load past imagery dates.'}
+        {state?.status === 'ready' &&
+          (versions.length > 0
+            ? `${versions.length} captures of the home point from Esri Wayback, by release date (the imagery may be older).`
+            : 'No past imagery found for this area.')}
+      </p>
     </>
   );
 }

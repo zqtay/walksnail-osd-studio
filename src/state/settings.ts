@@ -47,7 +47,11 @@ export interface OverlaySettings {
   /** Show the GPS map overlay (when the OSD contains coordinates). */
   mapEnabled: boolean;
   /** Map tile source; 'none' draws the trail on a plain background (offline). */
-  mapTiles: 'map' | 'satellite' | 'none';
+  mapTiles: 'map' | 'dark' | 'topo' | 'satellite' | 'hybrid' | 'none';
+  /** Esri Wayback release for satellite styles; 0 uses the latest imagery. */
+  mapImagery: number;
+  /** Publication date of `mapImagery` (for the credit line and the picker). */
+  mapImageryDate: string;
   /** Keep the drone centered, or fit the whole trail. */
   mapMode: 'follow' | 'overview';
   /** Overlay outline. */
@@ -107,6 +111,8 @@ export const DEFAULT_SETTINGS: OverlaySettings = {
   useBackground: false,
   mapEnabled: true,
   mapTiles: 'map',
+  mapImagery: 0,
+  mapImageryDate: '',
   mapMode: 'follow',
   mapShape: 'rect',
   mapX: 0.8,
@@ -127,6 +133,8 @@ export const DEFAULT_SETTINGS: OverlaySettings = {
 /** Map setting keys (everything the Map section's reset restores). */
 export const MAP_SETTING_KEYS = [
   'mapTiles',
+  'mapImagery',
+  'mapImageryDate',
   'mapMode',
   'mapShape',
   'mapX',

@@ -1,7 +1,13 @@
 import type { OverlaySettings } from '../../state/settings';
 import type { GpsTrack } from './gps';
 import { formatDistance, haversineM } from './geo';
-import { TILE_PROVIDERS, type TileCache, type TileKey, type TileProvider } from './tiles';
+import {
+  PARENT_FALLBACK_LEVELS,
+  tileProviderFor,
+  type TileCache,
+  type TileLayer,
+  type TileRequest,
+} from './tiles';
 import { getPreparedTrack, sampleTrack, trailPolylines, type PreparedTrack } from './track';
 import { resolveHeading } from './heading';
 import {
@@ -20,6 +26,8 @@ type Ctx2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
 export type MapRenderSettings = Pick<
   OverlaySettings,
   | 'mapTiles'
+  | 'mapImagery'
+  | 'mapImageryDate'
   | 'mapMode'
   | 'mapShape'
   | 'mapX'
@@ -37,8 +45,6 @@ export type MapRenderSettings = Pick<
   | 'mapAdaptiveZoom'
 >;
 
-/** Cached lower-zoom levels tried while a tile is still downloading. */
-const PARENT_FALLBACK_LEVELS = 5;
 /** Interval (ms) at which a moving view is sampled when prefetching. */
 const PREFETCH_STEP_MS = 250;
 /**
@@ -50,9 +56,7 @@ const PREFETCH_PAD = 0.1;
 const HOME_FILL = '#2f80ed';
 const MAP_BG = '#1d232a';
 
-function providerFor(s: MapRenderSettings): TileProvider | undefined {
-  return s.mapTiles === 'none' ? undefined : TILE_PROVIDERS[s.mapTiles];
-}
+const providerFor = tileProviderFor;
 
 /**
  * Draw the GPS map overlay for time `tMs` (on the OSD timeline). Deterministic
@@ -84,7 +88,9 @@ export function renderMap(
   ctx.globalAlpha = s.mapOpacity;
   ctx.fillStyle = MAP_BG;
   ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
-  if (provider && tiles) drawTiles(ctx, tiles, provider, view);
+  if (provider && tiles) {
+    for (const layer of provider.layers) drawTiles(ctx, tiles, layer, view);
+  }
   ctx.globalAlpha = 1;
 
   drawTrail(ctx, prepared, view, tMs, s, u);
@@ -123,8 +129,9 @@ export function renderMap(
 }
 
 /**
- * Every tile the overlay will need between `startMs` and `endMs` (OSD time),
- * so an export can download them up front and render deterministically.
+ * Every tile (of every layer) the overlay will need between `startMs` and
+ * `endMs` (OSD time), so an export can download them up front and render
+ * deterministically.
  */
 export function collectMapTiles(
   track: GpsTrack,
@@ -133,14 +140,14 @@ export function collectMapTiles(
   endMs: number,
   W: number,
   H: number,
-): TileKey[] {
+): TileRequest[] {
   const provider = providerFor(s);
   if (!provider) return [];
   const prepared = getPreparedTrack(track, s.mapSmoothing);
   if (prepared.t.length === 0) return [];
   const rect = computeMapRect(s, W, H);
 
-  const keys = new Map<string, TileKey>();
+  const keys = new Map<string, TileRequest>();
   const add = (view: MapView) => {
     const { x, y, w, h } = view.rect;
     const padded: MapView = {
@@ -152,8 +159,10 @@ export function collectMapTiles(
         h: h * (1 + 2 * PREFETCH_PAD),
       },
     };
-    for (const t of layoutTiles(padded, provider.maxZoom)) {
-      keys.set(`${t.z}/${t.x}/${t.y}`, { z: t.z, x: t.x, y: t.y });
+    for (const layer of provider.layers) {
+      for (const t of layoutTiles(padded, layer.maxZoom)) {
+        keys.set(`${layer.id}/${t.z}/${t.x}/${t.y}`, { layer, z: t.z, x: t.x, y: t.y });
+      }
     }
   };
 
@@ -173,20 +182,26 @@ function timeSteps(startMs: number, endMs: number): number[] {
   return out;
 }
 
-function drawTiles(ctx: Ctx2D, tiles: TileCache, provider: TileProvider, view: MapView) {
-  for (const t of layoutTiles(view, provider.maxZoom)) {
-    const img = tiles.get(provider, t.z, t.x, t.y);
+function drawTiles(ctx: Ctx2D, tiles: TileCache, layer: TileLayer, view: MapView) {
+  for (const t of layoutTiles(view, layer.maxZoom)) {
+    const img = tiles.get(layer, t.z, t.x, t.y);
     if (img) {
       ctx.drawImage(img, t.dx, t.dy, t.dw, t.dh);
       continue;
     }
-    // Stretch a cached ancestor tile until this one arrives.
+    // Stretch a cached ancestor tile until this one arrives. If this zoom is
+    // missing on the server, download the ancestor instead (one level at a
+    // time: only once a level has failed is the next one up requested).
+    let missing = tiles.hasFailed(layer, t.z, t.x, t.y);
     for (let up = 1; up <= PARENT_FALLBACK_LEVELS && t.z - up >= 0; up++) {
       const f = 2 ** up;
       const px = Math.floor(t.x / f);
       const py = Math.floor(t.y / f);
-      const parent = tiles.get(provider, t.z - up, px, py, false);
-      if (!parent) continue;
+      const parent = tiles.get(layer, t.z - up, px, py, missing);
+      if (!parent) {
+        missing = missing && tiles.hasFailed(layer, t.z - up, px, py);
+        continue;
+      }
       const sw = parent.width / f;
       const sh = parent.height / f;
       ctx.drawImage(
@@ -362,6 +377,13 @@ function drawAttribution(ctx: Ctx2D, shape: 'rect' | 'circle', rect: MapRect, te
     }
     x = rect.x + rect.w / 2 - tw / 2;
   } else {
+    // Shrink to fit narrow maps (long credits, e.g. satellite + labels).
+    const avail = rect.w - pad * 4;
+    if (tw > avail && avail > 0) {
+      fontPx *= avail / tw;
+      ctx.font = `${fontPx}px system-ui, sans-serif`;
+      tw = ctx.measureText(text).width;
+    }
     x = rect.x + rect.w - tw - pad * 2;
     y = rect.y + rect.h - fontPx - pad;
   }

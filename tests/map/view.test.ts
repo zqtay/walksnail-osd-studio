@@ -92,10 +92,35 @@ describe('computeMapView', () => {
     const settings = { ...DEFAULT_SETTINGS, mapTiles: 'map' as const };
     const keys = collectMapTiles(gps, settings, 0, osd.durationMs, 1920, 1080);
     expect(keys.length).toBeGreaterThan(0);
-    expect(new Set(keys.map((k) => `${k.z}/${k.x}/${k.y}`)).size).toBe(keys.length);
+    expect(new Set(keys.map((k) => `${k.layer.id}/${k.z}/${k.x}/${k.y}`)).size).toBe(
+      keys.length,
+    );
     expect(
       collectMapTiles(gps, { ...settings, mapTiles: 'none' }, 0, 1000, 1920, 1080),
     ).toEqual([]);
+  });
+
+  it('collects every layer of a multi-layer style', () => {
+    const base = collectMapTiles(
+      gps,
+      { ...DEFAULT_SETTINGS, mapTiles: 'satellite' },
+      0,
+      osd.durationMs,
+      1920,
+      1080,
+    );
+    const hybrid = collectMapTiles(
+      gps,
+      { ...DEFAULT_SETTINGS, mapTiles: 'hybrid' },
+      0,
+      osd.durationMs,
+      1920,
+      1080,
+    );
+    expect(hybrid.length).toBe(base.length * 3);
+    expect(new Set(hybrid.map((k) => k.layer.id))).toEqual(
+      new Set(['esri-imagery', 'esri-roads', 'esri-places']),
+    );
   });
 });
 

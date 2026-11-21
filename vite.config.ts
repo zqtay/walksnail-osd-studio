@@ -14,15 +14,27 @@ export default defineConfig({
         // Precache the app shell + wasm assets so everything runs offline.
         globPatterns: ['**/*.{js,css,html,svg,png,wasm}'],
         maximumFileSizeToCacheInBytes: 64 * 1024 * 1024,
-        // Map tiles are the only network resource; keep the ones already seen
-        // so revisited areas render offline and exports don't re-download.
+        // Map tiles (and the Wayback release list) are the only network
+        // resources; keep the ones already seen so revisited areas render
+        // offline and exports don't re-download.
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/(tile\.openstreetmap\.org|server\.arcgisonline\.com)\//,
+            urlPattern:
+              /^https:\/\/(tile\.openstreetmap\.org|server\.arcgisonline\.com|wayback\.maptiles\.arcgis\.com)\//,
             handler: 'CacheFirst',
             options: {
               cacheName: 'map-tiles',
               expiration: { maxEntries: 3000, maxAgeSeconds: 14 * 24 * 60 * 60 },
+              cacheableResponse: { statuses: [200] },
+            },
+          },
+          {
+            // Esri Wayback release list: refresh when online, cached offline.
+            urlPattern: /^https:\/\/s3-us-west-2\.amazonaws\.com\/config\.maptiles\.arcgis\.com\//,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'map-config',
+              networkTimeoutSeconds: 10,
               cacheableResponse: { statuses: [200] },
             },
           },
