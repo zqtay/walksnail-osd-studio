@@ -38,6 +38,7 @@ export type MapRenderSettings = Pick<
   | 'mapSmoothing'
   | 'mapOpacity'
   | 'mapShowHome'
+  | 'mapShowHomeDistance'
   | 'mapFutureTrail'
   | 'mapTrailColor'
   | 'mapHeading'
@@ -54,6 +55,8 @@ const PREFETCH_STEP_MS = 250;
 const PREFETCH_PAD = 0.1;
 
 const HOME_FILL = '#2f80ed';
+/** Home marker radius, in UI units. */
+const HOME_R = 8;
 const MAP_BG = '#1d232a';
 
 const providerFor = tileProviderFor;
@@ -95,25 +98,27 @@ export function renderMap(
 
   drawTrail(ctx, prepared, view, tMs, s, u);
 
-  let homeOffscreen: { x: number; y: number } | undefined;
+  // Home marker: in place when in view, otherwise pinned to the edge.
+  let home: { x: number; y: number; onEdge: boolean } | undefined;
   if (s.mapShowHome && prepared.home) {
     const [hx, hy] = worldToScreen(view, prepared.home.x, prepared.home.y);
-    const markerR = 8 * u;
-    // Inset enough that the outward arrow (tip at markerR + 4u) stays visible.
-    const edge = projectToEdge(s.mapShape, rect, markerR + 6 * u, hx, hy);
-    if (edge.inside) {
-      drawHome(ctx, hx, hy, markerR, u);
-    } else {
-      homeOffscreen = edge;
-    }
+    // Inset enough that the outward arrow (tip at HOME_R + 4u) stays visible.
+    const edge = projectToEdge(s.mapShape, rect, (HOME_R + 6) * u, hx, hy);
+    home = edge.inside ? { x: hx, y: hy, onEdge: false } : { x: edge.x, y: edge.y, onEdge: true };
   }
+
+  // An in-view home sits under the drone; the edge marker and label go on top.
+  if (home && !home.onEdge) drawHome(ctx, home.x, home.y, HOME_R * u, u);
 
   const [dx, dy] = worldToScreen(view, drone.x, drone.y);
   drawDrone(ctx, dx, dy, drone.heading, u);
 
-  if (homeOffscreen && prepared.home) {
-    const dist = haversineM(drone.lat, drone.lon, prepared.home.lat, prepared.home.lon);
-    drawHomeEdge(ctx, rect, homeOffscreen.x, homeOffscreen.y, formatDistance(dist), u);
+  if (home && prepared.home) {
+    if (home.onEdge) drawHomeEdge(ctx, rect, home.x, home.y, u);
+    if (s.mapShowHomeDistance) {
+      const dist = haversineM(drone.lat, drone.lon, prepared.home.lat, prepared.home.lon);
+      drawHomeDistance(ctx, s.mapShape, rect, home, formatDistance(dist), u);
+    }
   }
 
   if (provider) drawAttribution(ctx, s.mapShape, rect, provider.attribution);
@@ -303,19 +308,10 @@ function drawHome(ctx: Ctx2D, x: number, y: number, r: number, u: number) {
   ctx.restore();
 }
 
-/** Home marker pinned to the edge, with an outward arrow and distance label. */
-function drawHomeEdge(
-  ctx: Ctx2D,
-  rect: MapRect,
-  x: number,
-  y: number,
-  label: string,
-  u: number,
-) {
-  const r = 8 * u;
-  const cx = rect.x + rect.w / 2;
-  const cy = rect.y + rect.h / 2;
-  const angle = Math.atan2(y - cy, x - cx);
+/** Home marker pinned to the edge, with an arrow pointing toward home. */
+function drawHomeEdge(ctx: Ctx2D, rect: MapRect, x: number, y: number, u: number) {
+  const r = HOME_R * u;
+  const angle = Math.atan2(y - (rect.y + rect.h / 2), x - (rect.x + rect.w / 2));
 
   // Outward-pointing arrow tip just beyond the marker.
   ctx.save();
@@ -331,8 +327,21 @@ function drawHomeEdge(
   ctx.restore();
 
   drawHome(ctx, x, y, r, u);
+}
 
-  // Distance pill on the inward side of the marker.
+/**
+ * Distance pill next to the home marker: on the inward side of an edge marker,
+ * otherwise below the marker (above it when there's no room below).
+ */
+function drawHomeDistance(
+  ctx: Ctx2D,
+  shape: 'rect' | 'circle',
+  rect: MapRect,
+  home: { x: number; y: number; onEdge: boolean },
+  label: string,
+  u: number,
+) {
+  const r = HOME_R * u;
   const fontPx = Math.max(9, Math.round(11 * u));
   ctx.save();
   ctx.font = `600 ${fontPx}px system-ui, sans-serif`;
@@ -340,11 +349,22 @@ function drawHomeEdge(
   const pad = 3 * u;
   const bw = tw + pad * 2;
   const bh = fontPx + pad * 1.4;
-  const off = r + 4 * u + Math.max(bw, bh) / 2;
-  let lx = x - Math.cos(angle) * off;
-  let ly = y - Math.sin(angle) * off;
+
+  let lx = home.x;
+  let ly: number;
+  if (home.onEdge) {
+    const angle = Math.atan2(home.y - (rect.y + rect.h / 2), home.x - (rect.x + rect.w / 2));
+    const off = r + 4 * u + Math.max(bw, bh) / 2;
+    lx -= Math.cos(angle) * off;
+    ly = home.y - Math.sin(angle) * off;
+  } else {
+    const gap = r + 3 * u + bh / 2;
+    ly = home.y + gap;
+    if (!boxFitsShape(shape, rect, lx, ly, bw, bh)) ly = home.y - gap;
+  }
   lx = Math.max(rect.x + bw / 2 + 2, Math.min(rect.x + rect.w - bw / 2 - 2, lx));
   ly = Math.max(rect.y + bh / 2 + 2, Math.min(rect.y + rect.h - bh / 2 - 2, ly));
+
   ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
   roundRectPath(ctx, lx - bw / 2, ly - bh / 2, bw, bh, bh / 2);
   ctx.fill();
@@ -353,6 +373,26 @@ function drawHomeEdge(
   ctx.textBaseline = 'middle';
   ctx.fillText(label, lx, ly + fontPx * 0.05);
   ctx.restore();
+}
+
+/** Whether a box centered at (cx, cy) lies fully inside the overlay shape. */
+function boxFitsShape(
+  shape: 'rect' | 'circle',
+  rect: MapRect,
+  cx: number,
+  cy: number,
+  bw: number,
+  bh: number,
+): boolean {
+  const xs = [cx - bw / 2, cx + bw / 2];
+  const ys = [cy - bh / 2, cy + bh / 2];
+  if (shape === 'circle') {
+    const ox = rect.x + rect.w / 2;
+    const oy = rect.y + rect.h / 2;
+    const R = Math.min(rect.w, rect.h) / 2;
+    return xs.every((x) => ys.every((y) => Math.hypot(x - ox, y - oy) <= R));
+  }
+  return xs[0] >= rect.x && xs[1] <= rect.x + rect.w && ys[0] >= rect.y && ys[1] <= rect.y + rect.h;
 }
 
 function drawAttribution(ctx: Ctx2D, shape: 'rect' | 'circle', rect: MapRect, text: string) {

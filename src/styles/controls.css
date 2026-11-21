@@ -88,6 +88,16 @@ select {
   margin-top: 10px;
 }
 
+/* Sub-option of the toggle above it. */
+.toggle--nested {
+  margin-left: 24px;
+}
+
+.toggle:has(input:disabled) {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .fields {
   display: flex;
   flex-wrap: wrap;

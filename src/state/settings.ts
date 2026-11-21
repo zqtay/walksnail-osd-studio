@@ -72,6 +72,8 @@ export interface OverlaySettings {
   mapOpacity: number;
   /** Show the home point. */
   mapShowHome: boolean;
+  /** Label the home point with the drone's distance from it. */
+  mapShowHomeDistance: boolean;
   /** Draw the not-yet-flown part of the trail faintly. */
   mapFutureTrail: boolean;
   /** Trail color. */
@@ -123,6 +125,7 @@ export const DEFAULT_SETTINGS: OverlaySettings = {
   mapSmoothing: 10,
   mapOpacity: 0.9,
   mapShowHome: true,
+  mapShowHomeDistance: true,
   mapFutureTrail: true,
   mapTrailColor: '#ff4d4f',
   mapHeading: 'numeric',
@@ -145,6 +148,7 @@ export const MAP_SETTING_KEYS = [
   'mapSmoothing',
   'mapOpacity',
   'mapShowHome',
+  'mapShowHomeDistance',
   'mapFutureTrail',
   'mapTrailColor',
   'mapHeading',

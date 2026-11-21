@@ -231,6 +231,15 @@ export function MapPanel({ settings, update, hasOsd, gps }: MapPanelProps) {
         />
         <span>Show home point</span>
       </label>
+      <label className="toggle toggle--nested">
+        <input
+          type="checkbox"
+          checked={settings.mapShowHomeDistance}
+          disabled={!settings.mapShowHome}
+          onChange={(e) => update({ mapShowHomeDistance: e.target.checked })}
+        />
+        <span>Show home distance</span>
+      </label>
       <label className="toggle">
         <input
           type="checkbox"
