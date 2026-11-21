@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { formatRemaining } from '../../lib/export/eta';
 import { ArrowRight, Download } from 'lucide-react';
 import { clampMs, formatMs, parseTimeMs } from '../../lib/engine/clock';
 import { RangeSlider } from './range-slider';
@@ -23,6 +24,8 @@ interface ExportPanelProps {
   progress: number;
   /** Optional status line shown while busy (e.g. a preparation step). */
   status?: string;
+  /** Estimated milliseconds left while encoding; undefined until known. */
+  remainingMs?: number;
   onExport: () => void;
   onCancel: () => void;
   disabled?: boolean;
@@ -43,6 +46,7 @@ export function ExportPanel({
   busy,
   progress,
   status,
+  remainingMs,
   onExport,
   onCancel,
   disabled,
@@ -166,14 +170,32 @@ export function ExportPanel({
 
       {busy && status && <p className="hint">{status}</p>}
       {busy ? (
-        <div className="export__progress">
-          <div className="export__bar">
-            <div className="export__fill" style={{ width: `${Math.round(progress * 100)}%` }} />
+        <>
+          <div className="export__progress">
+            <div
+              className="export__bar"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.floor(progress * 100)}
+            >
+              <div className="export__fill" style={{ width: `${progress * 100}%` }} />
+            </div>
+            <button className="btn" onClick={onCancel}>
+              Cancel
+            </button>
           </div>
-          <button className="btn" onClick={onCancel}>
-            Cancel
-          </button>
-        </div>
+          {!status && (
+            <div className="export__meta">
+              <span>{Math.floor(progress * 100)}%</span>
+              <span>
+                {remainingMs === undefined
+                  ? 'Estimating time left…'
+                  : `${formatRemaining(remainingMs)} left`}
+              </span>
+            </div>
+          )}
+        </>
       ) : (
         <button
           className="btn btn--primary export__go"

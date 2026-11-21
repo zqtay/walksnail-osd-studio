@@ -197,6 +197,16 @@ select {
   overflow: hidden;
 }
 
+/* Percentage and time left under the progress bar. */
+.export__meta {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .export__fill {
   height: 100%;
   background: var(--accent);

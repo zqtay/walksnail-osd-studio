@@ -370,6 +370,7 @@ export function App() {
               busy={exporter.exporting}
               progress={exporter.progress}
               status={exporter.status}
+              remainingMs={exporter.remainingMs}
               onExport={() => void exporter.runExport()}
               onCancel={exporter.cancelExport}
               disabled={!hasVideo && !hasOverlay}

@@ -5,6 +5,7 @@ import {
 } from '../lib/export/media-recorder';
 import type { OverlaySources } from '../lib/engine/compositor';
 import { collectMapTiles } from '../lib/map/map-renderer';
+import { estimateRemainingMs } from '../lib/export/eta';
 import type { OverlaySettings } from '../state/settings';
 import type { ExportUiState } from '../components/panel/export-panel';
 import type { NativeSize } from './use-player';
@@ -48,6 +49,8 @@ export interface UseExporter {
   progress: number;
   /** Human-readable step shown while preparing the export, if any. */
   status: string | undefined;
+  /** Estimated milliseconds left while encoding; undefined until known. */
+  remainingMs: number | undefined;
   runExport: () => Promise<void>;
   cancelExport: () => void;
 }
@@ -75,6 +78,7 @@ export function useExporter({
   const [exporting, setExporting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState<string>();
+  const [remainingMs, setRemainingMs] = useState<number>();
   const abortRef = useRef<AbortController | null>(null);
 
   // Default the output resolution to the video's native size when it loads.
@@ -94,6 +98,7 @@ export function useExporter({
     if (!videoName && !hasOverlay) return;
     setExporting(true);
     setProgress(0);
+    setRemainingMs(undefined);
     const controller = new AbortController();
     abortRef.current = controller;
 
@@ -113,6 +118,13 @@ export function useExporter({
       await prefetchMapTiles(controller.signal);
       setStatus(undefined);
 
+      // Time the encode itself (tile downloads above have their own status).
+      const encodeStart = performance.now();
+      const onProgress = (p: { fraction: number }) => {
+        setProgress(p.fraction);
+        setRemainingMs(estimateRemainingMs(p.fraction, performance.now() - encodeStart));
+      };
+
       let result;
       if (videoFile && canHighQualityExport) {
         const { exportWithMediabunny } = await import('../lib/export/mediabunny');
@@ -121,7 +133,7 @@ export function useExporter({
           settings,
           exportOptions,
           videoFile,
-          (p) => setProgress(p.fraction),
+          onProgress,
           controller.signal,
         );
       } else if (videoFile && exportVideo) {
@@ -130,7 +142,7 @@ export function useExporter({
           sources,
           settings,
           exportOptions,
-          (p) => setProgress(p.fraction),
+          onProgress,
           controller.signal,
         );
       } else if (hasOverlay || preferBackground) {
@@ -139,7 +151,7 @@ export function useExporter({
           sources,
           settings,
           exportOptions,
-          (p) => setProgress(p.fraction),
+          onProgress,
           controller.signal,
         );
       } else {
@@ -161,6 +173,7 @@ export function useExporter({
     } finally {
       setExporting(false);
       setProgress(0);
+      setRemainingMs(undefined);
       setStatus(undefined);
       abortRef.current = null;
     }
@@ -207,6 +220,7 @@ export function useExporter({
     exporting,
     progress,
     status,
+    remainingMs,
     runExport,
     cancelExport,
   };
