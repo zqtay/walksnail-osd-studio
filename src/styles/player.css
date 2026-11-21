@@ -52,3 +52,47 @@
 .move-editor:active {
   cursor: grabbing;
 }
+
+/* Map overlay drag/resize handle (only the box itself takes pointer input). */
+.map-editor {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.map-editor__box {
+  position: absolute;
+  pointer-events: auto;
+  cursor: move;
+  touch-action: none;
+  border: 1px dashed transparent;
+  border-radius: 4px;
+}
+
+.map-editor__box:hover,
+.map-editor__box--active {
+  border-color: rgba(255, 255, 255, 0.7);
+}
+
+.map-editor__box--circle {
+  border-radius: 50%;
+}
+
+.map-editor__handle {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.6);
+  cursor: nwse-resize;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.map-editor__box:hover .map-editor__handle,
+.map-editor__box--active .map-editor__handle {
+  opacity: 1;
+}

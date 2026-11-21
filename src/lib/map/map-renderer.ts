@@ -1,0 +1,377 @@
+import type { OverlaySettings } from '../../state/settings';
+import type { GpsTrack } from './gps';
+import { formatDistance, haversineM } from './geo';
+import { TILE_PROVIDERS, type TileCache, type TileKey, type TileProvider } from './tiles';
+import { getPreparedTrack, sampleTrack, trailPolylines, type PreparedTrack } from './track';
+import { resolveHeading } from './heading';
+import {
+  computeMapRect,
+  computeMapView,
+  layoutTiles,
+  projectToEdge,
+  worldToScreen,
+  type MapRect,
+  type MapView,
+} from './view';
+
+type Ctx2D = CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D;
+
+/** Map settings consumed by the renderer. */
+export type MapRenderSettings = Pick<
+  OverlaySettings,
+  | 'mapTiles'
+  | 'mapMode'
+  | 'mapShape'
+  | 'mapX'
+  | 'mapY'
+  | 'mapSize'
+  | 'mapAspect'
+  | 'mapZoom'
+  | 'mapSmoothing'
+  | 'mapOpacity'
+  | 'mapShowHome'
+  | 'mapFutureTrail'
+  | 'mapTrailColor'
+  | 'mapHeading'
+  | 'mapTrailSeconds'
+>;
+
+/** Cached lower-zoom levels tried while a tile is still downloading. */
+const PARENT_FALLBACK_LEVELS = 5;
+/** Interval (ms) at which the follow view is sampled when prefetching. */
+const PREFETCH_STEP_MS = 250;
+
+const HOME_FILL = '#2f80ed';
+const MAP_BG = '#1d232a';
+
+function providerFor(s: MapRenderSettings): TileProvider | undefined {
+  return s.mapTiles === 'none' ? undefined : TILE_PROVIDERS[s.mapTiles];
+}
+
+/**
+ * Draw the GPS map overlay for time `tMs` (on the OSD timeline). Deterministic
+ * given the same cached tiles, so preview and export match.
+ */
+export function renderMap(
+  ctx: Ctx2D,
+  track: GpsTrack,
+  tiles: TileCache | undefined,
+  s: MapRenderSettings,
+  tMs: number,
+  W: number,
+  H: number,
+): void {
+  const prepared = getPreparedTrack(track, s.mapSmoothing);
+  if (prepared.t.length === 0) return;
+  const rect = computeMapRect(s, W, H);
+  if (rect.w < 4 || rect.h < 4) return;
+  const drone = sampleTrack(prepared, tMs, resolveHeading(track.headings, s.mapHeading));
+  const view = computeMapView(prepared, drone, s, rect);
+  const u = rect.h / 300; // style unit: sizes scale with the overlay
+  const provider = providerFor(s);
+
+  ctx.save();
+  clipShape(ctx, s.mapShape, rect, 10 * u);
+  ctx.clip();
+
+  // Background + tiles share the map opacity; markers stay fully opaque.
+  ctx.globalAlpha = s.mapOpacity;
+  ctx.fillStyle = MAP_BG;
+  ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+  if (provider && tiles) drawTiles(ctx, tiles, provider, view);
+  ctx.globalAlpha = 1;
+
+  drawTrail(ctx, prepared, view, tMs, s, u);
+
+  let homeOffscreen: { x: number; y: number } | undefined;
+  if (s.mapShowHome && prepared.home) {
+    const [hx, hy] = worldToScreen(view, prepared.home.x, prepared.home.y);
+    const markerR = 8 * u;
+    // Inset enough that the outward arrow (tip at markerR + 4u) stays visible.
+    const edge = projectToEdge(s.mapShape, rect, markerR + 6 * u, hx, hy);
+    if (edge.inside) {
+      drawHome(ctx, hx, hy, markerR, u);
+    } else {
+      homeOffscreen = edge;
+    }
+  }
+
+  const [dx, dy] = worldToScreen(view, drone.x, drone.y);
+  drawDrone(ctx, dx, dy, drone.heading, u);
+
+  if (homeOffscreen && prepared.home) {
+    const dist = haversineM(drone.lat, drone.lon, prepared.home.lat, prepared.home.lon);
+    drawHomeEdge(ctx, rect, homeOffscreen.x, homeOffscreen.y, formatDistance(dist), u);
+  }
+
+  if (provider) drawAttribution(ctx, s.mapShape, rect, provider.attribution);
+  ctx.restore();
+
+  // Border.
+  ctx.save();
+  clipShape(ctx, s.mapShape, rect, 10 * u);
+  ctx.lineWidth = Math.max(1, 2 * u);
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+  ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * Every tile the overlay will need between `startMs` and `endMs` (OSD time),
+ * so an export can download them up front and render deterministically.
+ */
+export function collectMapTiles(
+  track: GpsTrack,
+  s: MapRenderSettings,
+  startMs: number,
+  endMs: number,
+  W: number,
+  H: number,
+): TileKey[] {
+  const provider = providerFor(s);
+  if (!provider) return [];
+  const prepared = getPreparedTrack(track, s.mapSmoothing);
+  if (prepared.t.length === 0) return [];
+  const rect = computeMapRect(s, W, H);
+
+  const keys = new Map<string, TileKey>();
+  const add = (view: MapView) => {
+    for (const t of layoutTiles(view, provider.maxZoom)) {
+      keys.set(`${t.z}/${t.x}/${t.y}`, { z: t.z, x: t.x, y: t.y });
+    }
+  };
+
+  // The whole-trail view never moves, so one layout covers the export.
+  const steps = s.mapMode === 'overview' ? [startMs] : timeSteps(startMs, endMs);
+  for (const t of steps) {
+    add(computeMapView(prepared, sampleTrack(prepared, t), s, rect));
+  }
+  return [...keys.values()];
+}
+
+function timeSteps(startMs: number, endMs: number): number[] {
+  const out: number[] = [];
+  for (let t = startMs; t < endMs; t += PREFETCH_STEP_MS) out.push(t);
+  out.push(endMs);
+  return out;
+}
+
+function drawTiles(ctx: Ctx2D, tiles: TileCache, provider: TileProvider, view: MapView) {
+  for (const t of layoutTiles(view, provider.maxZoom)) {
+    const img = tiles.get(provider, t.z, t.x, t.y);
+    if (img) {
+      ctx.drawImage(img, t.dx, t.dy, t.dw, t.dh);
+      continue;
+    }
+    // Stretch a cached ancestor tile until this one arrives.
+    for (let up = 1; up <= PARENT_FALLBACK_LEVELS && t.z - up >= 0; up++) {
+      const f = 2 ** up;
+      const px = Math.floor(t.x / f);
+      const py = Math.floor(t.y / f);
+      const parent = tiles.get(provider, t.z - up, px, py, false);
+      if (!parent) continue;
+      const sw = parent.width / f;
+      const sh = parent.height / f;
+      ctx.drawImage(
+        parent,
+        (t.x - px * f) * sw,
+        (t.y - py * f) * sh,
+        sw,
+        sh,
+        t.dx,
+        t.dy,
+        t.dw,
+        t.dh,
+      );
+      break;
+    }
+  }
+}
+
+function drawTrail(
+  ctx: Ctx2D,
+  track: PreparedTrack,
+  view: MapView,
+  tMs: number,
+  s: MapRenderSettings,
+  u: number,
+) {
+  const lw = Math.max(1.5, 3 * u);
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  const { past, future } = trailPolylines(track, tMs, s.mapTrailSeconds);
+
+  const trace = (points: [number, number][]) => {
+    ctx.beginPath();
+    points.forEach(([wx, wy], i) => {
+      const [x, y] = worldToScreen(view, wx, wy);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+  };
+
+  if (s.mapFutureTrail && future.length > 1) {
+    trace(future);
+    ctx.globalAlpha = 0.35;
+    ctx.strokeStyle = s.mapTrailColor;
+    ctx.lineWidth = lw;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  if (past.length > 1) {
+    trace(past);
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)';
+    ctx.lineWidth = lw + 2 * u;
+    ctx.stroke();
+    ctx.strokeStyle = s.mapTrailColor;
+    ctx.lineWidth = lw;
+    ctx.stroke();
+  }
+}
+
+function drawDrone(ctx: Ctx2D, x: number, y: number, heading: number | undefined, u: number) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.fillStyle = '#ffffff';
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+  ctx.lineWidth = Math.max(1, 1.5 * u);
+  ctx.beginPath();
+  if (heading === undefined) {
+    ctx.arc(0, 0, 5 * u, 0, Math.PI * 2);
+  } else {
+    // Arrowhead pointing up (north) before rotation.
+    const s = 10 * u;
+    ctx.rotate(heading);
+    ctx.moveTo(0, -s);
+    ctx.lineTo(s * 0.7, s * 0.75);
+    ctx.lineTo(0, s * 0.35);
+    ctx.lineTo(-s * 0.7, s * 0.75);
+    ctx.closePath();
+  }
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawHome(ctx: Ctx2D, x: number, y: number, r: number, u: number) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fillStyle = HOME_FILL;
+  ctx.fill();
+  ctx.lineWidth = Math.max(1, 1.5 * u);
+  ctx.strokeStyle = '#ffffff';
+  ctx.stroke();
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `bold ${Math.round(r * 1.2)}px system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('H', x, y + r * 0.05);
+  ctx.restore();
+}
+
+/** Home marker pinned to the edge, with an outward arrow and distance label. */
+function drawHomeEdge(
+  ctx: Ctx2D,
+  rect: MapRect,
+  x: number,
+  y: number,
+  label: string,
+  u: number,
+) {
+  const r = 8 * u;
+  const cx = rect.x + rect.w / 2;
+  const cy = rect.y + rect.h / 2;
+  const angle = Math.atan2(y - cy, x - cx);
+
+  // Outward-pointing arrow tip just beyond the marker.
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.beginPath();
+  ctx.moveTo(r + 4 * u, 0);
+  ctx.lineTo(r - 1 * u, -4 * u);
+  ctx.lineTo(r - 1 * u, 4 * u);
+  ctx.closePath();
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+  ctx.restore();
+
+  drawHome(ctx, x, y, r, u);
+
+  // Distance pill on the inward side of the marker.
+  const fontPx = Math.max(9, Math.round(11 * u));
+  ctx.save();
+  ctx.font = `600 ${fontPx}px system-ui, sans-serif`;
+  const tw = ctx.measureText(label).width;
+  const pad = 3 * u;
+  const bw = tw + pad * 2;
+  const bh = fontPx + pad * 1.4;
+  const off = r + 4 * u + Math.max(bw, bh) / 2;
+  let lx = x - Math.cos(angle) * off;
+  let ly = y - Math.sin(angle) * off;
+  lx = Math.max(rect.x + bw / 2 + 2, Math.min(rect.x + rect.w - bw / 2 - 2, lx));
+  ly = Math.max(rect.y + bh / 2 + 2, Math.min(rect.y + rect.h - bh / 2 - 2, ly));
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+  roundRectPath(ctx, lx - bw / 2, ly - bh / 2, bw, bh, bh / 2);
+  ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, lx, ly + fontPx * 0.05);
+  ctx.restore();
+}
+
+function drawAttribution(ctx: Ctx2D, shape: 'rect' | 'circle', rect: MapRect, text: string) {
+  let fontPx = Math.max(8, rect.h * 0.032);
+  ctx.save();
+  ctx.font = `${fontPx}px system-ui, sans-serif`;
+  let tw = ctx.measureText(text).width;
+  const pad = fontPx * 0.35;
+
+  let x: number;
+  let y: number;
+  if (shape === 'circle') {
+    // Centered near the bottom, shrunk to fit the circle's chord there.
+    y = rect.y + rect.h * 0.86;
+    const r = rect.h / 2;
+    const dy = y - (rect.y + r);
+    const chord = 2 * Math.sqrt(Math.max(0, r * r - dy * dy)) - pad * 4;
+    if (tw > chord && chord > 0) {
+      fontPx *= chord / tw;
+      ctx.font = `${fontPx}px system-ui, sans-serif`;
+      tw = ctx.measureText(text).width;
+    }
+    x = rect.x + rect.w / 2 - tw / 2;
+  } else {
+    x = rect.x + rect.w - tw - pad * 2;
+    y = rect.y + rect.h - fontPx - pad;
+  }
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+  ctx.fillRect(x - pad, y - pad * 0.5, tw + pad * 2, fontPx + pad);
+  ctx.fillStyle = '#222';
+  ctx.textBaseline = 'top';
+  ctx.fillText(text, x, y);
+  ctx.restore();
+}
+
+function clipShape(ctx: Ctx2D, shape: 'rect' | 'circle', rect: MapRect, radius: number) {
+  if (shape === 'circle') {
+    ctx.beginPath();
+    ctx.arc(rect.x + rect.w / 2, rect.y + rect.h / 2, Math.min(rect.w, rect.h) / 2, 0, Math.PI * 2);
+  } else {
+    roundRectPath(ctx, rect.x, rect.y, rect.w, rect.h, radius);
+  }
+}
+
+function roundRectPath(ctx: Ctx2D, x: number, y: number, w: number, h: number, r: number) {
+  const rr = Math.max(0, Math.min(r, w / 2, h / 2));
+  ctx.beginPath();
+  ctx.moveTo(x + rr, y);
+  ctx.arcTo(x + w, y, x + w, y + h, rr);
+  ctx.arcTo(x + w, y + h, x, y + h, rr);
+  ctx.arcTo(x, y + h, x, y, rr);
+  ctx.arcTo(x, y, x + w, y, rr);
+  ctx.closePath();
+}

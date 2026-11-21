@@ -3,9 +3,12 @@ import { parseOsd, type OsdData } from '../lib/parsers/osd';
 import { parseSrt, type SrtData } from '../lib/parsers/srt';
 import { loadFontAtlas, type FontAtlas } from '../lib/parsers/font';
 import { pairFiles } from '../lib/engine/pairing';
+import { extractGpsTrack, type GpsTrack } from '../lib/map/gps';
 
 export interface LoadedMedia {
   osd?: OsdData;
+  /** GPS track decoded from the OSD's lat/lon elements, if present. */
+  gps?: GpsTrack;
   srt?: SrtData;
   font?: FontAtlas;
   videoFile?: File;
@@ -53,6 +56,7 @@ export function useMediaLoader(): UseMediaLoader {
       }
       if (paired.osd) {
         next.osd = parseOsd(await paired.osd.arrayBuffer());
+        next.gps = extractGpsTrack(next.osd);
         next.osdName = paired.osd.name;
       }
       if (paired.srt) {

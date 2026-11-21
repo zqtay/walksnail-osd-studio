@@ -10,8 +10,11 @@ import { OsdPanel } from './components/panel/osd-panel';
 import { TelemetryPanel } from './components/panel/telemetry-panel';
 import { MaskEditor } from './components/mask-editor';
 import { MoveEditor } from './components/move-editor';
+import { MapEditor } from './components/map-editor';
+import { MapPanel } from './components/panel/map-panel';
 import { ExportPanel } from './components/panel/export-panel';
-import { useOverlaySettings, DEFAULT_SETTINGS } from './state/settings';
+import { useOverlaySettings, DEFAULT_SETTINGS, MAP_SETTING_KEYS } from './state/settings';
+import { mapTileCache } from './lib/map/tiles';
 import { useMediaLoader } from './hooks/use-media-loader';
 import { usePlayer } from './hooks/use-player';
 import { useExporter, canHighQualityExport } from './hooks/use-exporter';
@@ -65,7 +68,13 @@ export function App() {
   } = usePlayer(loaded.videoUrl, overlayDurationMs);
 
   const exporter = useExporter({
-    sources: { osd: loaded.osd, srt: loaded.srt, font: loaded.font },
+    sources: {
+      osd: loaded.osd,
+      srt: loaded.srt,
+      font: loaded.font,
+      gps: loaded.gps,
+      tiles: mapTileCache,
+    },
     settings,
     videoName: loaded.videoName,
     videoFile: loaded.videoFile,
@@ -101,6 +110,9 @@ export function App() {
       srtOffsetY: DEFAULT_SETTINGS.srtOffsetY,
     });
 
+  const resetMap = () =>
+    update(Object.fromEntries(MAP_SETTING_KEYS.map((k) => [k, DEFAULT_SETTINGS[k]])));
+
   const resetExport = () => {
     exporter.resetExportUi();
     setTrim(0, duration);
@@ -125,6 +137,8 @@ export function App() {
     settings.srtOffsetY !== DEFAULT_SETTINGS.srtOffsetY ||
     settings.srtFields.length !== DEFAULT_SETTINGS.srtFields.length ||
     settings.srtFields.some((f, i) => f !== DEFAULT_SETTINGS.srtFields[i]);
+
+  const mapDirty = MAP_SETTING_KEYS.some((k) => settings[k] !== DEFAULT_SETTINGS[k]);
 
   const exportDirty =
     exporter.exportUi.width !== nativeSize.w ||
@@ -187,6 +201,8 @@ export function App() {
                   osd={loaded.osd}
                   srt={loaded.srt}
                   font={loaded.font}
+                  gps={loaded.gps}
+                  tiles={mapTileCache}
                   settings={overlaySettings}
                   timeMs={current}
                   width={nativeSize.w}
@@ -218,6 +234,14 @@ export function App() {
                     moves={settings.osdMoves}
                     mask={settings.osdMask}
                     onChange={(m) => update({ osdMoves: m })}
+                  />
+                )}
+                {settings.mapEnabled && loaded.gps && !maskEditing && !moveEditing && (
+                  <MapEditor
+                    videoWidth={nativeSize.w}
+                    videoHeight={nativeSize.h}
+                    settings={settings}
+                    onChange={update}
                   />
                 )}
               </div>
@@ -317,6 +341,22 @@ export function App() {
             />
           </Section>
 
+          <Section
+            title="Map"
+            toggle={{
+              checked: settings.mapEnabled,
+              onChange: (v) => update({ mapEnabled: v }),
+            }}
+            onReset={mapDirty ? resetMap : undefined}
+          >
+            <MapPanel
+              settings={settings}
+              update={update}
+              hasOsd={Boolean(loaded.osd)}
+              gps={loaded.gps}
+            />
+          </Section>
+
           <Section title="Export" onReset={exportDirty ? resetExport : undefined}>
             <ExportPanel
               state={exporter.exportUi}
@@ -329,6 +369,7 @@ export function App() {
               nativeHeight={nativeSize.h}
               busy={exporter.exporting}
               progress={exporter.progress}
+              status={exporter.status}
               onExport={() => void exporter.runExport()}
               onCancel={exporter.cancelExport}
               disabled={!hasVideo && !hasOverlay}

@@ -2,6 +2,8 @@ import { useEffect, useRef } from 'react';
 import type { OsdData } from '../lib/parsers/osd';
 import type { SrtData } from '../lib/parsers/srt';
 import type { FontAtlas } from '../lib/parsers/font';
+import type { GpsTrack } from '../lib/map/gps';
+import type { TileCache } from '../lib/map/tiles';
 import { drawOverlay } from '../lib/engine/compositor';
 import type { OverlaySettings } from '../state/settings';
 
@@ -10,6 +12,9 @@ interface OverlayCanvasProps {
   osd?: OsdData;
   srt?: SrtData;
   font?: FontAtlas;
+  gps?: GpsTrack;
+  /** Map tile cache; the canvas repaints when new tiles arrive. */
+  tiles?: TileCache;
   settings: OverlaySettings;
   /** Synthetic clock (ms) used when there is no video. */
   timeMs?: number;
@@ -37,6 +42,8 @@ export function OverlayCanvas({
   osd,
   srt,
   font,
+  gps,
+  tiles,
   settings,
   timeMs,
   width,
@@ -57,7 +64,8 @@ export function OverlayCanvas({
     let rafHandle: number | null = null;
     let cancelled = false;
 
-    const draw = () => {
+    // Paint the current frame without scheduling another callback.
+    const paint = () => {
       if (cancelled) return;
       const w = video.videoWidth;
       const h = video.videoHeight;
@@ -75,8 +83,12 @@ export function OverlayCanvas({
       }
 
       const tMs = video.currentTime * 1000;
-      drawOverlay(ctx, { osd, srt, font }, settings, tMs, w, h);
+      drawOverlay(ctx, { osd, srt, font, gps, tiles }, settings, tMs, w, h);
+    };
 
+    const draw = () => {
+      if (cancelled) return;
+      paint();
       schedule();
     };
 
@@ -88,10 +100,13 @@ export function OverlayCanvas({
       }
     };
 
-    // Redraw immediately on relevant events (paused seeking, resize, etc.).
-    const kick = () => draw();
+    // Repaint immediately on relevant events (paused seeking, resize, newly
+    // downloaded map tiles). The frame-callback chain is already running, so
+    // these only paint rather than starting another chain.
+    const kick = () => paint();
     video.addEventListener('seeked', kick);
     video.addEventListener('loadedmetadata', kick);
+    const unsubscribeTiles = tiles?.subscribe(kick);
     // Draw once right away so changes (e.g. background color) are visible even
     // while paused, when requestVideoFrameCallback would not fire.
     draw();
@@ -100,12 +115,13 @@ export function OverlayCanvas({
       cancelled = true;
       video.removeEventListener('seeked', kick);
       video.removeEventListener('loadedmetadata', kick);
+      unsubscribeTiles?.();
       if (rvfcHandle !== null && v.cancelVideoFrameCallback) {
         v.cancelVideoFrameCallback(rvfcHandle);
       }
       if (rafHandle !== null) cancelAnimationFrame(rafHandle);
     };
-  }, [video, osd, srt, font, settings, background]);
+  }, [video, osd, srt, font, gps, tiles, settings, background]);
 
   // Video-less path: redraw over the background color on any input change.
   useEffect(() => {
@@ -121,13 +137,17 @@ export function OverlayCanvas({
       canvas.height = h;
     }
 
-    ctx.clearRect(0, 0, w, h);
-    if (background) {
-      ctx.fillStyle = background;
-      ctx.fillRect(0, 0, w, h);
-    }
-    drawOverlay(ctx, { osd, srt, font }, settings, timeMs ?? 0, w, h);
-  }, [video, osd, srt, font, settings, timeMs, width, height, background]);
+    const paint = () => {
+      ctx.clearRect(0, 0, w, h);
+      if (background) {
+        ctx.fillStyle = background;
+        ctx.fillRect(0, 0, w, h);
+      }
+      drawOverlay(ctx, { osd, srt, font, gps, tiles }, settings, timeMs ?? 0, w, h);
+    };
+    paint();
+    return tiles?.subscribe(paint);
+  }, [video, osd, srt, font, gps, tiles, settings, timeMs, width, height, background]);
 
   return <canvas ref={canvasRef} className="overlay-canvas" />;
 }

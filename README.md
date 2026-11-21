@@ -17,7 +17,15 @@ Everything runs locally in your browser — your footage never leaves your devic
   and a Walksnail/BF/INAV font atlas.
 - **Link‑telemetry panel** from the `.srt` (signal, latency, bitrate,
   battery, distance, flight time…), with per-field selection.
-- **100% local & offline** — no upload, no backend. Installable as a PWA.
+- **GPS map overlay** — when the `.osd` shows the flight controller's GPS
+  latitude/longitude, the coordinates are decoded and the flight trail is drawn
+  on a street or satellite map: a minimap that follows the drone, or the whole
+  trail with the drone moving along it. Size, position (drag in the preview),
+  zoom, trail smoothing and the home point (pinned to the edge with its
+  distance when out of view) are adjustable.
+- **100% local & offline** — no upload, no backend. Installable as a PWA. (Map
+  tiles are the one exception: they are downloaded when the map is used, and
+  cached; choose *None* for a fully offline trail.)
 - **Live overlay controls** — sync offset, position nudge, scale, a
   drag-to-hide **OSD element mask**, and drag-to-**move individual OSD cells**
   to any grid position.
@@ -80,6 +88,10 @@ Then open the printed local URL (typically `http://localhost:5173`).
    the overlay leads/lags the footage.
    - In the **OSD** panel, **Mask cells** hides elements (e.g. the crosshair),
      and **Move cells** lets you drag individual glyphs to a new grid position.
+   - The **Map** panel appears when the `.osd` contains GPS coordinates (enable
+     the *GPS latitude* and *GPS longitude* elements in your flight
+     controller's OSD). Drag the map in the preview to move it, or its corner
+     to resize.
    - The **Background** panel picks the color shown in place of the video and,
      when a video is loaded, toggles between the video and that color.
 4. Set the **trim range** in the Export panel, then **Export clip** to download
@@ -101,6 +113,7 @@ src/
 ├─ lib/
 │  ├─ parsers/     # .osd binary, .srt telemetry, and font atlas decoders
 │  ├─ engine/      # time/sync clock, deterministic canvas compositor
+│  ├─ map/         # GPS decoding from OSD glyphs, trail smoothing, tiles, map renderer
 │  └─ export/      # Mediabunny (primary) + MediaRecorder (fallback) exporters
 ├─ hooks/          # useMediaLoader · usePlayer · useExporter
 ├─ components/     # video overlay, timeline, transport, sidebar panels
@@ -113,6 +126,11 @@ src/
   `t`, the last frame with `timestamp ≤ t` is drawn (step/hold).
 - **`.srt`** — standard SubRip whose payload is VRX link telemetry (not GPS),
   parsed into time-stamped field maps.
+- **GPS** — the `.osd` stores no telemetry, only glyphs. Coordinates are read
+  from the text after the latitude/longitude marker glyphs (Betaflight `0x89` /
+  `0x98`); home is the fix where the home-distance element first shows a number
+  (arming). Map tiles (OpenStreetMap, Esri World Imagery) are fetched with CORS
+  and pre-downloaded before export so every frame renders deterministically.
 - **Overlay** — the same deterministic `drawOverlay` is used for both the live
   preview and the export, so the burned-in result matches what you see.
 

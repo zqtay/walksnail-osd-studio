@@ -1,6 +1,9 @@
 import type { OsdData } from '../parsers/osd';
 import type { SrtData } from '../parsers/srt';
 import type { FontAtlas } from '../parsers/font';
+import type { GpsTrack } from '../map/gps';
+import type { TileCache } from '../map/tiles';
+import { renderMap } from '../map/map-renderer';
 import { activeOsdFrame, activeSrtCue } from './clock';
 import { renderOsdFrame, renderSrtPanel } from './renderer';
 import type { OverlaySettings } from '../../state/settings';
@@ -11,10 +14,14 @@ export interface OverlaySources {
   osd?: OsdData;
   srt?: SrtData;
   font?: FontAtlas;
+  /** GPS track decoded from the OSD (drives the map overlay). */
+  gps?: GpsTrack;
+  /** Map tile cache; without it the map draws on a plain background. */
+  tiles?: TileCache;
 }
 
 /**
- * Draw the OSD grid and SRT telemetry panel for a given time onto a 2D context.
+ * Draw the OSD grid, SRT telemetry panel and GPS map for a given time onto a 2D context.
  * Shared by the live preview and the export pipeline so both produce identical
  * pixels. Does not clear the context; callers decide whether to clear or draw
  * over the video frame.
@@ -27,7 +34,7 @@ export function drawOverlay(
   width: number,
   height: number,
 ): void {
-  const { osd, srt, font } = sources;
+  const { osd, srt, font, gps, tiles } = sources;
 
   if (settings.osdEnabled && osd && font) {
     const frame = activeOsdFrame(osd, timeMs, settings.osdOffsetMs);
@@ -59,5 +66,10 @@ export function drawOverlay(
         offsetY: settings.srtOffsetY,
       });
     }
+  }
+
+  // The GPS track comes from the OSD, so it follows the OSD sync offset.
+  if (settings.mapEnabled && gps) {
+    renderMap(ctx, gps, tiles, settings, timeMs - settings.osdOffsetMs, width, height);
   }
 }

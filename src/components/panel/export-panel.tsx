@@ -21,6 +21,8 @@ interface ExportPanelProps {
   nativeHeight: number;
   busy: boolean;
   progress: number;
+  /** Optional status line shown while busy (e.g. a preparation step). */
+  status?: string;
   onExport: () => void;
   onCancel: () => void;
   disabled?: boolean;
@@ -40,6 +42,7 @@ export function ExportPanel({
   nativeHeight,
   busy,
   progress,
+  status,
   onExport,
   onCancel,
   disabled,
@@ -161,6 +164,7 @@ export function ExportPanel({
         <span>Include audio</span>
       </label>
 
+      {busy && status && <p className="hint">{status}</p>}
       {busy ? (
         <div className="export__progress">
           <div className="export__bar">

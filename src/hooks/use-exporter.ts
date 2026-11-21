@@ -4,6 +4,8 @@ import {
   extensionForMime,
 } from '../lib/export/media-recorder';
 import type { OverlaySources } from '../lib/engine/compositor';
+import { collectMapTiles } from '../lib/map/map-renderer';
+import { TILE_PROVIDERS } from '../lib/map/tiles';
 import type { OverlaySettings } from '../state/settings';
 import type { ExportUiState } from '../components/panel/export-panel';
 import type { NativeSize } from './use-player';
@@ -45,6 +47,8 @@ export interface UseExporter {
   resetExportUi: () => void;
   exporting: boolean;
   progress: number;
+  /** Human-readable step shown while preparing the export, if any. */
+  status: string | undefined;
   runExport: () => Promise<void>;
   cancelExport: () => void;
 }
@@ -71,6 +75,7 @@ export function useExporter({
   const [exportUi, setExportUiState] = useState<ExportUiState>(DEFAULT_EXPORT_UI);
   const [exporting, setExporting] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [status, setStatus] = useState<string>();
   const abortRef = useRef<AbortController | null>(null);
 
   // Default the output resolution to the video's native size when it loads.
@@ -106,6 +111,9 @@ export function useExporter({
     };
 
     try {
+      await prefetchMapTiles(controller.signal);
+      setStatus(undefined);
+
       let result;
       if (videoFile && canHighQualityExport) {
         const { exportWithMediabunny } = await import('../lib/export/mediabunny');
@@ -154,7 +162,38 @@ export function useExporter({
     } finally {
       setExporting(false);
       setProgress(0);
+      setStatus(undefined);
       abortRef.current = null;
+    }
+  }
+
+  /**
+   * Download every map tile the export will draw, so the frame-by-frame render
+   * never hits a missing tile. Failures (e.g. offline) are tolerated: those
+   * areas fall back to a lower-zoom tile or the plain map background.
+   */
+  async function prefetchMapTiles(signal: AbortSignal) {
+    const { gps, tiles } = sources;
+    if (!settings.mapEnabled || !gps || !tiles || settings.mapTiles === 'none') return;
+    const offset = settings.osdOffsetMs;
+    const keys = collectMapTiles(
+      gps,
+      settings,
+      trimStartMs - offset,
+      trimEndMs - offset,
+      exportUi.width,
+      exportUi.height,
+    );
+    if (keys.length === 0) return;
+    setStatus(`Downloading map tiles 0/${keys.length}…`);
+    const { failed } = await tiles.prefetch(
+      TILE_PROVIDERS[settings.mapTiles],
+      keys,
+      signal,
+      (done, total) => setStatus(`Downloading map tiles ${done}/${total}…`),
+    );
+    if (failed > 0) {
+      console.warn(`Map: ${failed} of ${keys.length} tiles could not be downloaded.`);
     }
   }
 
@@ -169,6 +208,7 @@ export function useExporter({
     resetExportUi,
     exporting,
     progress,
+    status,
     runExport,
     cancelExport,
   };

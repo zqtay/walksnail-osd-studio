@@ -44,6 +44,41 @@ export interface OverlaySettings {
   bgColor: string;
   /** Show the background color in place of the video (even when a video is loaded). */
   useBackground: boolean;
+  /** Show the GPS map overlay (when the OSD contains coordinates). */
+  mapEnabled: boolean;
+  /** Map tile source; 'none' draws the trail on a plain background (offline). */
+  mapTiles: 'map' | 'satellite' | 'none';
+  /** Keep the drone centered, or fit the whole trail. */
+  mapMode: 'follow' | 'overview';
+  /** Overlay outline. */
+  mapShape: 'rect' | 'circle';
+  /** Overlay left edge as a fraction of the output width. */
+  mapX: number;
+  /** Overlay top edge as a fraction of the output height. */
+  mapY: number;
+  /** Overlay height as a fraction of the output height. */
+  mapSize: number;
+  /** Overlay width / height (rect shape only). */
+  mapAspect: number;
+  /** Zoom level in follow mode (one tile at this zoom spans the overlay height). */
+  mapZoom: number;
+  /** Trail smoothing, 0..100 (%). */
+  mapSmoothing: number;
+  /** Opacity of the map background/tiles, 0..1. */
+  mapOpacity: number;
+  /** Show the home point. */
+  mapShowHome: boolean;
+  /** Draw the not-yet-flown part of the trail faintly. */
+  mapFutureTrail: boolean;
+  /** Trail color. */
+  mapTrailColor: string;
+  /**
+   * Drone arrow heading source: the OSD numerical heading, the OSD compass bar,
+   * or inferred from the trail. Falls back when the OSD lacks the choice.
+   */
+  mapHeading: 'numeric' | 'compass' | 'trail';
+  /** Show only the last N seconds of flown trail; 0 shows all of it. */
+  mapTrailSeconds: number;
 }
 
 export const DEFAULT_SETTINGS: OverlaySettings = {
@@ -65,7 +100,42 @@ export const DEFAULT_SETTINGS: OverlaySettings = {
   srtOffsetY: 0,
   bgColor: '#000000',
   useBackground: false,
+  mapEnabled: true,
+  mapTiles: 'map',
+  mapMode: 'follow',
+  mapShape: 'rect',
+  mapX: 0.8,
+  mapY: 0.6,
+  mapSize: 0.32,
+  mapAspect: 1,
+  mapZoom: 18,
+  mapSmoothing: 10,
+  mapOpacity: 0.9,
+  mapShowHome: true,
+  mapFutureTrail: true,
+  mapTrailColor: '#ff4d4f',
+  mapHeading: 'numeric',
+  mapTrailSeconds: 0,
 };
+
+/** Map setting keys (everything the Map section's reset restores). */
+export const MAP_SETTING_KEYS = [
+  'mapTiles',
+  'mapMode',
+  'mapShape',
+  'mapX',
+  'mapY',
+  'mapSize',
+  'mapAspect',
+  'mapZoom',
+  'mapSmoothing',
+  'mapOpacity',
+  'mapShowHome',
+  'mapFutureTrail',
+  'mapTrailColor',
+  'mapHeading',
+  'mapTrailSeconds',
+] as const satisfies readonly (keyof OverlaySettings)[];
 
 const STORAGE_KEY = 'walksnail-osd-studio:settings';
 
