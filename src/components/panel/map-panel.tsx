@@ -112,9 +112,24 @@ export function MapPanel({ settings, update, hasOsd, gps }: MapPanelProps) {
           onChange={(v) => update({ mapAspect: v })}
         />
       )}
-      {settings.mapMode === 'follow' && (
+      <label className="toggle">
+        <input
+          type="checkbox"
+          checked={settings.mapAdaptiveZoom}
+          onChange={(e) => update({ mapAdaptiveZoom: e.target.checked })}
+        />
+        <span>Adaptive zoom</span>
+      </label>
+      {settings.mapAdaptiveZoom && (
+        <p className="hint">
+          {settings.mapMode === 'follow'
+            ? 'Zooms out smoothly when needed to keep the home point in view.'
+            : 'Fits the drone and home point, zooming smoothly as they move apart.'}
+        </p>
+      )}
+      {(settings.mapMode === 'follow' || settings.mapAdaptiveZoom) && (
         <Slider
-          label="Zoom"
+          label={settings.mapAdaptiveZoom ? 'Max zoom' : 'Zoom'}
           suffix=""
           min={12}
           max={20}

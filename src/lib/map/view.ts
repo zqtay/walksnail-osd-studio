@@ -4,7 +4,14 @@ import type { PreparedTrack, TrackSample } from './track';
 /** Map-overlay settings used for layout. */
 export type MapLayoutSettings = Pick<
   OverlaySettings,
-  'mapX' | 'mapY' | 'mapSize' | 'mapAspect' | 'mapShape' | 'mapMode' | 'mapZoom'
+  | 'mapX'
+  | 'mapY'
+  | 'mapSize'
+  | 'mapAspect'
+  | 'mapShape'
+  | 'mapMode'
+  | 'mapZoom'
+  | 'mapAdaptiveZoom'
 >;
 
 /** Map overlay rectangle in output pixels. */
@@ -46,6 +53,13 @@ const OVERVIEW_MAX_ZOOM = 19;
 const OVERVIEW_PADDING = 0.12;
 /** Native tile size the tile zoom is chosen against. */
 const TILE_PX = 256;
+/**
+ * Adaptive zoom keeps the drone and home this far inside the edge (fraction of
+ * the overlay height), so their markers and the home label stay fully visible.
+ */
+const ADAPTIVE_MARGIN = 0.07;
+/** Adaptive zoom never zooms out further than this. */
+const ADAPTIVE_MIN_ZOOM = 2;
 
 /**
  * Overlay rectangle for a `W × H` output. Position and size are stored relative
@@ -71,9 +85,29 @@ export function computeMapView(
   s: MapLayoutSettings,
   rect: MapRect,
 ): MapView {
+  const home = track.home;
+
   if (s.mapMode === 'follow') {
-    const zoom = s.mapZoom;
+    let zoom = s.mapZoom;
+    if (s.mapAdaptiveZoom && home) {
+      // Drone stays centered; zoom out just enough to keep home inside.
+      const unit = maxUnitToFit(s.mapShape, rect, home.x - drone.x, home.y - drone.y, 'center');
+      zoom = clampAdaptiveZoom(Math.log2(unit / rect.h), s.mapZoom);
+    }
     return { rect, cx: drone.x, cy: drone.y, unit: 2 ** zoom * rect.h, zoom };
+  }
+
+  if (s.mapAdaptiveZoom && home) {
+    // Fit just the drone and home, centered between them.
+    const unit = maxUnitToFit(s.mapShape, rect, home.x - drone.x, home.y - drone.y, 'span');
+    const zoom = clampAdaptiveZoom(Math.log2(unit / rect.h), s.mapZoom);
+    return {
+      rect,
+      cx: (drone.x + home.x) / 2,
+      cy: (drone.y + home.y) / 2,
+      unit: 2 ** zoom * rect.h,
+      zoom,
+    };
   }
 
   // Whole trail: fit the bounding box (trail + home) with some padding.
@@ -90,6 +124,39 @@ export function computeMapView(
     unit,
     zoom: Math.log2(unit / rect.h),
   };
+}
+
+/**
+ * Largest scale (px per world unit) at which an offset `(dx, dy)` fits inside
+ * the overlay inset by the adaptive margin. `center`: the offset is measured
+ * from the view center (follow mode). `span`: both ends must fit with the view
+ * centered between them (whole-trail mode).
+ */
+function maxUnitToFit(
+  shape: 'rect' | 'circle',
+  rect: MapRect,
+  dx: number,
+  dy: number,
+  mode: 'center' | 'span',
+): number {
+  const m = rect.h * ADAPTIVE_MARGIN;
+  // In span mode each end sits half the offset from the center.
+  const k = mode === 'span' ? 0.5 : 1;
+  const ax = Math.abs(dx) * k;
+  const ay = Math.abs(dy) * k;
+  if (shape === 'circle') {
+    const d = Math.hypot(ax, ay);
+    return d > 0 ? Math.max(0, Math.min(rect.w, rect.h) / 2 - m) / d : Infinity;
+  }
+  return Math.min(
+    ax > 0 ? Math.max(0, rect.w / 2 - m) / ax : Infinity,
+    ay > 0 ? Math.max(0, rect.h / 2 - m) / ay : Infinity,
+  );
+}
+
+/** Never zoom in past the user's max zoom, nor out past the minimum. */
+function clampAdaptiveZoom(fitZoom: number, maxZoom: number): number {
+  return Math.max(ADAPTIVE_MIN_ZOOM, Math.min(maxZoom, fitZoom));
 }
 
 /** Convert a world point to output pixels. */

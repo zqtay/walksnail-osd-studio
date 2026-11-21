@@ -34,12 +34,18 @@ export type MapRenderSettings = Pick<
   | 'mapTrailColor'
   | 'mapHeading'
   | 'mapTrailSeconds'
+  | 'mapAdaptiveZoom'
 >;
 
 /** Cached lower-zoom levels tried while a tile is still downloading. */
 const PARENT_FALLBACK_LEVELS = 5;
-/** Interval (ms) at which the follow view is sampled when prefetching. */
+/** Interval (ms) at which a moving view is sampled when prefetching. */
 const PREFETCH_STEP_MS = 250;
+/**
+ * Extra coverage (fraction per side) when prefetching, so tiles that scroll in
+ * between two sampled views are already downloaded.
+ */
+const PREFETCH_PAD = 0.1;
 
 const HOME_FILL = '#2f80ed';
 const MAP_BG = '#1d232a';
@@ -136,13 +142,24 @@ export function collectMapTiles(
 
   const keys = new Map<string, TileKey>();
   const add = (view: MapView) => {
-    for (const t of layoutTiles(view, provider.maxZoom)) {
+    const { x, y, w, h } = view.rect;
+    const padded: MapView = {
+      ...view,
+      rect: {
+        x: x - w * PREFETCH_PAD,
+        y: y - h * PREFETCH_PAD,
+        w: w * (1 + 2 * PREFETCH_PAD),
+        h: h * (1 + 2 * PREFETCH_PAD),
+      },
+    };
+    for (const t of layoutTiles(padded, provider.maxZoom)) {
       keys.set(`${t.z}/${t.x}/${t.y}`, { z: t.z, x: t.x, y: t.y });
     }
   };
 
-  // The whole-trail view never moves, so one layout covers the export.
-  const steps = s.mapMode === 'overview' ? [startMs] : timeSteps(startMs, endMs);
+  // The plain whole-trail view never moves, so one layout covers the export.
+  const isStatic = s.mapMode === 'overview' && !s.mapAdaptiveZoom;
+  const steps = isStatic ? [startMs] : timeSteps(startMs, endMs);
   for (const t of steps) {
     add(computeMapView(prepared, sampleTrack(prepared, t), s, rect));
   }

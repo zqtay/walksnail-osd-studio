@@ -79,6 +79,11 @@ export interface OverlaySettings {
   mapHeading: 'numeric' | 'compass' | 'trail';
   /** Show only the last N seconds of flown trail; 0 shows all of it. */
   mapTrailSeconds: number;
+  /**
+   * Continuously adjust zoom so the drone and home stay in view (`mapZoom`
+   * becomes the maximum zoom).
+   */
+  mapAdaptiveZoom: boolean;
 }
 
 export const DEFAULT_SETTINGS: OverlaySettings = {
@@ -116,6 +121,7 @@ export const DEFAULT_SETTINGS: OverlaySettings = {
   mapTrailColor: '#ff4d4f',
   mapHeading: 'numeric',
   mapTrailSeconds: 0,
+  mapAdaptiveZoom: false,
 };
 
 /** Map setting keys (everything the Map section's reset restores). */
@@ -135,6 +141,7 @@ export const MAP_SETTING_KEYS = [
   'mapTrailColor',
   'mapHeading',
   'mapTrailSeconds',
+  'mapAdaptiveZoom',
 ] as const satisfies readonly (keyof OverlaySettings)[];
 
 const STORAGE_KEY = 'walksnail-osd-studio:settings';

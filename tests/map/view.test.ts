@@ -22,6 +22,7 @@ const base: MapLayoutSettings = {
   mapShape: 'rect',
   mapMode: 'follow',
   mapZoom: 17,
+  mapAdaptiveZoom: false,
 };
 
 describe('computeMapRect', () => {
@@ -118,5 +119,89 @@ describe('projectToEdge', () => {
     const p = projectToEdge('circle', sq, 10, 350, 450);
     expect(p.inside).toBe(false);
     expect(Math.hypot(p.x - 50, p.y - 50)).toBeCloseTo(40, 6);
+  });
+});
+
+describe('adaptive zoom', () => {
+  const osd = parseOsd(readFixtureArrayBuffer('AscentG0245.osd'));
+  const gps = extractGpsTrack(osd)!;
+  const prepared = prepareTrack(gps, 10);
+  const home = prepared.home!;
+  const MARGIN = 0.07; // ADAPTIVE_MARGIN in view.ts
+  const times = Array.from({ length: 300 }, (_, i) => (i / 299) * osd.durationMs);
+
+  /** Is a world point inside the rect inset by the adaptive margin? */
+  const insideInset = (
+    view: ReturnType<typeof computeMapView>,
+    shape: 'rect' | 'circle',
+    wx: number,
+    wy: number,
+  ) => {
+    const { rect } = view;
+    const m = rect.h * MARGIN - 1e-6;
+    const [x, y] = worldToScreen(view, wx, wy);
+    const cx = rect.x + rect.w / 2;
+    const cy = rect.y + rect.h / 2;
+    if (shape === 'circle') return Math.hypot(x - cx, y - cy) <= rect.h / 2 - m;
+    return Math.abs(x - cx) <= rect.w / 2 - m && Math.abs(y - cy) <= rect.h / 2 - m;
+  };
+
+  describe.each([
+    ['follow', 'rect'],
+    ['follow', 'circle'],
+    ['overview', 'rect'],
+    ['overview', 'circle'],
+  ] as const)('%s / %s', (mode, shape) => {
+    // Max zoom 20 forces the adaptive fit to kick in for most of the flight.
+    const s: MapLayoutSettings = {
+      ...base,
+      mapMode: mode,
+      mapShape: shape,
+      mapZoom: 20,
+      mapAdaptiveZoom: true,
+    };
+    const rect = computeMapRect(s, 1920, 1080);
+
+    it('keeps the drone and home point in view without exceeding max zoom', () => {
+      for (const t of times) {
+        const drone = sampleTrack(prepared, t);
+        const view = computeMapView(prepared, drone, s, rect);
+        expect(view.zoom).toBeLessThanOrEqual(20);
+        expect(insideInset(view, shape, home.x, home.y)).toBe(true);
+        expect(insideInset(view, shape, drone.x, drone.y)).toBe(true);
+      }
+    });
+
+    it('zooms smoothly (no level steps)', () => {
+      let fractional = 0;
+      for (const t of times) {
+        const a = computeMapView(prepared, sampleTrack(prepared, t), s, rect).zoom;
+        const b = computeMapView(prepared, sampleTrack(prepared, t + 20), s, rect).zoom;
+        expect(Math.abs(b - a)).toBeLessThan(0.05);
+        if (Math.abs(a - Math.round(a)) > 0.01) fractional++;
+      }
+      expect(fractional).toBeGreaterThan(times.length / 2);
+    });
+  });
+
+  it('uses the max zoom while home is already in view (follow)', () => {
+    const s: MapLayoutSettings = { ...base, mapZoom: 15, mapAdaptiveZoom: true };
+    const rect = computeMapRect(s, 1920, 1080);
+    const view = computeMapView(prepared, sampleTrack(prepared, 60_000), s, rect);
+    expect(view.zoom).toBe(15);
+  });
+
+  it('samples the moving whole-trail view when prefetching export tiles', () => {
+    const settings = { ...DEFAULT_SETTINGS, mapMode: 'overview' as const, mapZoom: 20 };
+    const fixed = collectMapTiles(gps, settings, 0, osd.durationMs, 1920, 1080);
+    const adaptive = collectMapTiles(
+      gps,
+      { ...settings, mapAdaptiveZoom: true },
+      0,
+      osd.durationMs,
+      1920,
+      1080,
+    );
+    expect(adaptive.length).toBeGreaterThan(fixed.length);
   });
 });
